@@ -8,9 +8,8 @@ import { warmUp, setSources } from './lib/mp.js';
 import { scoreAll, rankOpportunities, bandOf, progressToCeiling } from './analysis/scoring.js';
 import { buildPlan } from './content/planner.js';
 import { COST_LABEL, EVIDENCE_LABEL, protocol } from './content/protocols.js';
-import { resolveBand } from './content/metricsCatalog.js';
 import * as store from './lib/store.js';
-import { scoreRing, countUp, domainBars, progressLine, metricsTable, rampFor } from './ui/charts.js';
+import { scoreRing, countUp, domainBars, progressLine, metricsTable } from './ui/charts.js';
 import { drawFaceOverlay, drawBodyOverlay } from './ui/overlay.js';
 
 const $  = (s, r = document) => r.querySelector(s);
