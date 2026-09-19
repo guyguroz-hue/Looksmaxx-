@@ -1,4 +1,10 @@
 node_modules/
-*.log
+.next/
+out/
+build/
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
 .DS_Store
+*.log
 /test/.artifacts/

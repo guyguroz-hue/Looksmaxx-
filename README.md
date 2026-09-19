@@ -1,135 +1,121 @@
-<div dir="rtl">
+# FORM
 
-# Looksmaxx
+**Better habits. Sharper you.**
 
-**מכשיר מדידה למראה** — סורק פנים וגוף, מודד במילימטרים, ומחזיר תוכנית שיפור לא-ניתוחית מדורגת לפי רמת ראיות.
+A personal presentation assistant. You take one photo; FORM tells you what
+already works, and gives you a short list of things worth trying — all of them
+under your control.
 
-הכול רץ **בדפדפן, על המכשיר**. אין שרת, אין חשבון, אין העלאת תמונות, ואין שום רכיב בתשלום.
+It does not score you.
 
-</div>
+---
 
-```
-שאלון (15 שאלות) ──┐
-                   ├──► 26 מדדים ──► 6 תחומים ──► ציון + תקרה ריאלית ──► תוכנית
-מצלמה ──► MediaPipe │
-(WASM, מקומי)      │    ▲
-  478 נק׳ פנים ─────┘    │
-                    כיול מ״מ לפי קוטר הקשתית (11.7 מ״מ)
+## What it refuses to do
 
-סריקת גוף = אופציונלי, פותח 6 מדדי יציבה והרכב גוף
-```
-
-<div dir="rtl">
-
-## למה זה שונה
+This is the part that shapes everything else, so it goes first.
 
 | | |
 |---|---|
-| **השאלון משנה את האבחנה** | פנים מלאות ב-BMI תקין הן אגירת נוזלים, לא שומן — והתוכנית מפסיקה להמליץ על גירעון קלורי. עיגולים כהים אחרי 8 שעות שינה מפנים לאלרגיות במקום ל"תישן יותר". גוון עור מכייל את בסיס מדידת האדמומיות, שהיה סף אחד לכל גווני העור. |
-| **מדידה, לא ניחוש** | קוטר הקשתית האנושית קבוע להפליא (11.7 מ״מ ±0.5) ללא תלות בגיל, מין או מוצא. המודל מזהה את טבעת הקשתית, וזה נותן **סרגל פיזי בתוך התמונה** — כך מתקבלות מידות במילימטרים במקום יחסים חסרי יחידות. |
-| **תקרה כנה** | כל מדד מסווג ל־`fixed` (שלד — לא ניתן לשינוי ללא ניתוח), `soft` (מושפע משומן/נוזלים) או `live` (אורח חיים). הציון ה"פוטנציאלי" סופר רווח **רק** ממה שבאמת ניתן לשנות. מדד שלדי לעולם לא מבטיח שיפור. |
-| **סילואט אמיתי** | רוחב מותן וירך נמדדים ממסכת הסגמנטציה, לא מנקודות שלד — נקודות מפרק לא יודעות איפה המותן. |
-| **יציבות על פני פריימים** | פריים בודד אינו מדידה. הסורק דוגם 12 פריימים שעוברים סף איכות (roll/yaw/pitch) ומאחד אותם בחציון, כך שפריים חריג לא מזיז את התוצאה. |
-| **ראיות חשופות** | לכל אחת מ־38 ההמלצות מצוינים: דרגת ראיות (A/B/C), עלות, זמן לתוצאה וסיכון. "תרגילי פנים" מסומן במפורש כראיות מוגבלות; "קרם הגנה" ו"שינה" כראיות חזקות. |
+| **No score, ever** | No rating, ranking, percentile or "better than X% of people". The prioritisation maths exists, but it is computed, sorted on and discarded — what reaches the screen is *High impact* / *Easy* / *Medium confidence*. A test asserts no score-shaped field or phrase can escape. |
+| **No diagnosis** | No condition is ever named. A test greps the entire rule catalogue for dermatological, endocrine and pharmaceutical vocabulary and fails on a match. Anything that could warrant a professional says so neutrally and says nothing more. |
+| **No ideal to measure against** | No golden ratio, no "correct" proportions, no comparison to a face that isn't yours. Face shape is used the way a barber uses it — to choose a framing — never as a standard to fall short of. |
+| **No obsessive loop** | Progress counts what you explored, not how you improved. There is no trend line of your face, and the app actively suggests waiting weeks between reads. |
 
-## הרצה
+## How it works
+
+```
+photo ─► quality gate ─► measurement ─► confidence cap
+                                             │
+             observed ──► inferred ──► recommended ──► prioritised
+              (what the    (what it      (what you      (order only)
+               image        might mean    could try)
+               shows)       for framing)
+```
+
+Two properties are enforced in code rather than by convention:
+
+**Photo quality caps confidence.** A rule cannot claim high confidence from a
+dark, angled frame — the cap is applied after the rule runs and the rule has no
+way to override it. A bad photo produces general suggestions that say so, not
+confident findings nobody can verify.
+
+**Observation, inference and recommendation are different types.** There is no
+code path from a measurement to advice that skips the hedged middle step,
+because the three are separate shapes in the type system.
+
+### The measurement
+
+The horizontal iris is about 11.7 mm in adults with very little variation, which
+makes it a physical ruler that happens to be inside every photograph. Scaling by
+it turns pixels into millimetres, so "your cheekbone width is 142 mm" is a real
+number you can take to an optician — rather than a ratio with no units.
+
+Capture runs a live loop and fuses twelve gate-passing frames with a median. One
+frame is not a measurement; landmark output jitters, and a single shot gives a
+different answer every time you press the button.
+
+## Running it
 
 ```bash
-npm start           # http://localhost:8080
-npm test            # מנוע המדידה + בדיקת דפדפן
+npm install
+npm run dev          # http://localhost:3000
+npm run verify       # typecheck + tests + production build
 ```
 
-או פשוט לפתוח את `index.html` משרת סטטי כלשהו. **אין שלב build** — ES modules בלבד, ולכן כל אירוח סטטי עובד כמו שהוא.
+Camera access needs HTTPS. `localhost` counts as secure; production needs a real
+certificate, which Vercel provides.
 
-> **חשוב:** `getUserMedia` דורש HTTPS. בפיתוח מקומי `localhost` נחשב מאובטח ועובד; בפרודקשן נדרש HTTPS אמיתי (Vercel מספק אוטומטית).
+## Stack
 
-> הסריקה הראשונה מורידה את מודלי הזיהוי (~13MB) פעם אחת. לאחר מכן הכול עובד גם ללא רשת.
+Next.js 16 (App Router) · TypeScript strict · Tailwind v4 · Motion · MediaPipe
+Tasks Vision · Supabase · Vercel.
 
-## עלות
+Detection runs as WASM in the browser. There is no inference server, no API key
+and no per-request cost — and no frame ever leaves the device.
 
-| רכיב | ספק | עלות |
-|---|---|---|
-| זיהוי פנים/גוף | MediaPipe Tasks (Apache-2.0), רץ מקומית | ‏0 ₪ |
-| מודלים | Google public model store | ‏0 ₪ |
-| Runtime | jsDelivr CDN — ניתן גם לאחסון עצמי | ‏0 ₪ |
-| אחסון נתונים | `localStorage` במכשיר | ‏0 ₪ |
-| אירוח | Vercel (או כל אירוח סטטי) | ‏0 ₪ |
-
-### אחסון עצמי (ללא CDN)
-
-</div>
-
-```html
-<body data-mp-module="/vendor/vision_bundle.mjs"
-      data-mp-wasm="/vendor/wasm"
-      data-mp-face="/vendor/face_landmarker.task"
-      data-mp-pose="/vendor/pose_landmarker_full.task">
-```
-
-<div dir="rtl">
-
-## הזרימה
-
-1. **שאלון** — גיל, מגדר, גובה, משקל, גוון עור, שינה, SPF, עישון ומה הכי מפריע. כל שאלה משנה משהו: טווח יעד, מדד שהמצלמה לא רואה, פרוטוקול שנכנס או יוצא, או סדר העדיפויות.
-2. **סריקת פנים** — 478 נקודות, 12 פריימים שעוברים סף איכות, איחוד בחציון.
-3. **תוצאה** — ציון, תקרה ריאלית, פירוק לפי תחום, תמונה מסומנת. **ללא הרשמה.**
-4. **הרשמה (אופציונלי)** — כדי לשמור היסטוריה ולעקוב אחרי שיפור.
-5. **סריקת גוף (אופציונלי)** — פותחת 6 מדדי יציבה והרכב גוף.
-
-## החלטות בטיחות
+## Tests
 
 | | |
 |---|---|
-| יעד ה-BMI הוא **טווח הבריאות** 18.5–24.9 | ולא ה-BMI ה"אופטימלי" מספרות האטרקטיביות. ירידה מתחת ל-18.5 **מורידה** את הציון. אפליקציה שמתגמלת על BMI נמוך היא אפליקציה עם נפגעים. |
-| רטינואידים נעלמים לגמרי בהריון | לא מודגשים — **מוסרים**. יש בדיקה שאוכפת את זה. |
-| משתמש בתת-משקל לא יקבל המלצת הפחתת שומן | אותו דבר, ואותה בדיקה. |
-| אין דירוג מול משתמשים אחרים | בשום מקום. |
+| `npm test` | 17 assertions, most of them safety: no score can escape, no medical vocabulary in the catalogue, confidence is capped by quality, every recommendation traces to an observation, every card answers what/why/how. |
+| `bash test/rls.sh` | Applies the schema to a real PostgreSQL and proves the row-level-security policies isolate users. The anon key is public by design, so RLS is the only thing making that safe. |
+| `node test/visual.mjs` | Boots the production build, walks every screen at 320/390/1280, fails on a console error or horizontal overflow. |
 
-## מה נמדד
+## Data
 
-**פנים** (מ־478 נקודות) — שלישי הפנים · חמישיות הרוחב · זווית קנתוס · fWHR · לחיים־לסת · זווית לסת · מלאות פנים · מרווח עיניים · יחסי אף/פה/שפתיים · **סימטריה ב־29 זוגות נקודות, במ״מ**
+Nothing leaves the device unless you create an account, and even then only
+numbers do. The `analyses` table has no column capable of holding an image —
+the privacy promise is structural rather than a policy note.
 
-**עור** (מדגימת פיקסלים ב־CIE-Lab) — עיגולים מתחת לעיניים (ΔL + Δa מול הלחי) · אחידות גוון · אדמומיות
+Schema and row-level-security policies: [`supabase/migrations`](supabase/migrations).
 
-**גוף** (מ־33 נקודות + מסכת סילואט) — כתפיים:מותן · מותן:ירך · רגליים:גו · הטיית כתפיים ואגן · **זווית ראש-צוואר** (המדד הקליני ל"ראש קדמי")
-
-## פרטיות
-
-- הפריימים נשארים בזיכרון הדף ונמחקים עם סגירתו. **אף תמונה לא נשמרת ולא נשלחת — גם לא עם חשבון.**
-- ללא חשבון: הכול ב-`localStorage` של הדפדפן הזה בלבד.
-- עם חשבון: עולים **רק** השאלון והמספרים. בטבלת `scans` אין בכלל עמודה שיכולה להכיל תמונה — ההבטחה נאכפת בסכימה, לא בכוונות טובות בצד הלקוח.
-- כפתור המחיקה מוחק גם את שורות הענן. ייצוא JSON זמין בכל רגע.
-- רשת נדרשת רק להורדת המודלים בפעם הראשונה (ולסנכרון, אם בחרת בו).
-
-הגדרת סנכרון: [`supabase/README.md`](supabase/README.md). בלי הגדרה — האפליקציה עובדת במלואה, מקומית.
-
-## סייגים — נא לקרוא
-
-1. **זה לא כלי רפואי.** אין כאן אבחון ואין תחליף לרופא, דיאטן או פיזיותרפיסט.
-2. **"אטרקטיביות" אינה כמות אובייקטיבית.** הטווחים כאן מבוססים על ספרות אנתרופומטרית ואסתטית בעלת הטיה תרבותית ידועה. הציון הוא מדד עקביות מול טווחים מתועדים — לא שיפוט על אדם.
-3. **קו השיער אינו מזוהה.** המודל אינו מחזיר טריכיון; מדד שלישי הפנים משתמש בקצה המצח כקירוב ומסומן בממשק כהערכה.
-4. **אם המעקב גורם מצוקה — זו סיבה להפסיק.** Looksmaxxing נקשר בספרות לדיסמורפיה גופנית. האפליקציה נמנעת בכוונה מדירוג מול אנשים אחרים ומדגישה מה כבר חזק.
-
-## מבנה
-
-</div>
+## Structure
 
 ```
-js/analysis/   geometry · landmarks · faceMetrics · skin · bodyMetrics · scoring
-js/content/    questionnaire · metricsCatalog (26 מדדים) · protocols (38) · profileMetrics · planner
-js/scan/       camera · scanner (סף איכות + איחוד חציון)
-js/ui/         quiz · charts · overlay · auth
-js/lib/        store · mp · supabase
-supabase/      schema.sql (טבלאות + RLS) · README
-test/          metrics.mjs (70 בדיקות) · smoke.mjs · pipeline.mjs · rls.sh
+src/
+  app/                  routes: welcome · onboarding · scan · results · plan · progress
+  components/           Shell, CaptureStage, AnalysisSequence, RecommendationCard
+  components/ui/        Button, Card, Label, Indicator
+  lib/vision/           geometry · landmarks · faceMeasure · skinRead · detector
+  lib/analysis/         types (the safety contract) · quality · pipeline
+  content/rules.ts      every observation, inference and recommendation
+  hooks/useCapture.ts   the live capture loop
+supabase/migrations/    schema + RLS
+test/                   safety · rls · visual
 ```
 
-<div dir="rtl">
+## Known limits
 
-פירוט מלא של הארכיטקטורה, תרשימי הזרימה והחלטות התכנון: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **The hairline is approximated.** FaceMesh has no trichion landmark; the top of
+  the detected oval stands in. Anything derived from it is treated as
+  approximate and never presented as a proportion standard.
+- **Single-camera depth.** Everything is measured in the image plane. Head turn
+  beyond the gate is rejected rather than corrected — a projective correction
+  from one view would add more error than it removes.
+- **Skin readings describe the photograph.** Lighting and texture are not
+  separable from a single frame, which is why those rules carry low confidence
+  and point to habits rather than conclusions.
 
-## רישיון
+## Licence
 
 MIT
-
-</div>

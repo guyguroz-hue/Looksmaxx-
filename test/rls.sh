@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Row-level-security test for supabase/schema.sql.
+# Row-level-security test for the FORM schema.
 #
 # The anon key shipped in client code is public by design — RLS is the only
 # thing that makes that safe. This proves the policies actually isolate users,
@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 DB=lmtest_rls
-SCHEMA="$PWD/supabase/schema.sql"
+SCHEMA="$PWD/supabase/migrations/0001_form_schema.sql"
 
 # Roles are cluster-wide, so a leftover from a previous run must go first.
 su postgres <<SH >/dev/null 2>&1
@@ -37,26 +37,26 @@ psql -q -t -A -d $DB <<'SQL'
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111','a@test'),
   ('22222222-2222-2222-2222-222222222222','b@test');
-insert into public.scans (user_id, taken_at, overall) values
-  ('11111111-1111-1111-1111-111111111111', now(), 77),
-  ('22222222-2222-2222-2222-222222222222', now(), 42);
+insert into public.analyses (user_id, taken_at, quality) values
+  ('11111111-1111-1111-1111-111111111111', now(), 'high'),
+  ('22222222-2222-2222-2222-222222222222', now(), 'low');
 create role app_anon nologin;
 grant usage on schema public to app_anon;
-grant select, insert, update, delete on public.profiles, public.scans to app_anon;
+grant select, insert, update, delete on public.profiles, public.analyses, public.recommendation_state to app_anon;
 set role app_anon;
 
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
-select 'A_sees=' || count(*) from public.scans;
-select 'A_score=' || coalesce(max(overall)::text,'x') from public.scans;
+select 'A_sees=' || count(*) from public.analyses;
+select 'A_reads=' || coalesce(max(quality),'x') from public.analyses;
 set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
-select 'B_score=' || coalesce(max(overall)::text,'x') from public.scans;
+select 'B_reads=' || coalesce(max(quality),'x') from public.analyses;
 set request.jwt.claim.sub = '';
-select 'anon_sees=' || count(*) from public.scans;
+select 'anon_sees=' || count(*) from public.analyses;
 select 'anon_profiles=' || count(*) from public.profiles;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
-delete from public.scans where user_id='22222222-2222-2222-2222-222222222222';
+delete from public.analyses where user_id='22222222-2222-2222-2222-222222222222';
 reset role;
-select 'B_survived=' || count(*) from public.scans where user_id='22222222-2222-2222-2222-222222222222';
+select 'B_survived=' || count(*) from public.analyses where user_id='22222222-2222-2222-2222-222222222222';
 SQL
 SH
 )
@@ -66,7 +66,7 @@ CROSS=$(su postgres <<SH 2>&1
 psql -q -d $DB <<'SQL'
 set role app_anon;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
-insert into public.scans (user_id, taken_at, overall) values ('22222222-2222-2222-2222-222222222222', now(), 99);
+insert into public.analyses (user_id, taken_at, quality) values ('22222222-2222-2222-2222-222222222222', now(), 'high');
 SQL
 SH
 )
@@ -74,9 +74,9 @@ CROSSUP=$(su postgres <<SH 2>&1
 psql -q -t -A -d $DB <<'SQL'
 set role app_anon;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
-update public.scans set overall = 1 where user_id = '22222222-2222-2222-2222-222222222222';
+update public.analyses set quality = 'high' where user_id = '22222222-2222-2222-2222-222222222222';
 reset role;
-select 'B_untouched=' || count(*) from public.scans where user_id='22222222-2222-2222-2222-222222222222' and overall = 42;
+select 'B_untouched=' || count(*) from public.analyses where user_id='22222222-2222-2222-2222-222222222222' and quality = 'low';
 SQL
 SH
 )
@@ -86,10 +86,10 @@ ALL=$(printf '%s\n%s\n' "$RESULT" "$CROSSUP")
 check () { if grep -qx "$1" <<<"$ALL"; then echo "  ✓ $2"; else echo "  ✗ $2 — got: $(grep -E "^${1%%=*}=" <<<"$ALL")"; fail=1; fi; }
 
 echo "row-level security"
-check "A_sees=1"        "user A sees exactly one scan (their own)"
-check "A_score=77"      "user A sees their own score, not user B's"
-check "B_score=42"      "user B sees their own score, not user A's"
-check "anon_sees=0"     "an unauthenticated caller sees no scans"
+check "A_sees=1"        "user A sees exactly one analysis (their own)"
+check "A_reads=high"      "user A reads their own row, not user B's"
+check "B_reads=low"      "user B reads their own row, not user A's"
+check "anon_sees=0"     "an unauthenticated caller sees no analyses"
 check "anon_profiles=0" "an unauthenticated caller sees no profiles"
 check "B_survived=1"    "user A cannot delete user B's row"
 check "B_untouched=1"   "user A cannot update user B's row"
