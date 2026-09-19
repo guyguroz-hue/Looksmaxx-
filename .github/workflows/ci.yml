@@ -27,6 +27,12 @@ jobs:
       - name: Browser smoke test
         run: node test/smoke.mjs
 
+      - name: Row-level security
+        run: |
+          sudo systemctl start postgresql || sudo service postgresql start
+          sudo -u postgres psql -c "select version()" >/dev/null
+          sudo bash test/rls.sh
+
       - name: Real MediaPipe pipeline
         run: |
           curl -sL https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.21.tgz | tar xz
