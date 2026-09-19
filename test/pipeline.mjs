@@ -36,7 +36,7 @@ page.on('pageerror', e => console.log('  pageerror:', e.message));
 
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 
-const { FACE_DRAW } = await import('/tmp/facegen.mjs');
+const { FACE_DRAW } = await import('./drawFace.js');
 const out = await page.evaluate(async ([base, FACE_DRAW_SRC]) => {
   const FACE_DRAW = eval(FACE_DRAW_SRC);
   const log = [];
