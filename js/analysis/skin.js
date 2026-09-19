@@ -45,12 +45,30 @@ function samplePatch(data, w, h, cx, cy, r) {
   return { ...mean, sd, n };
 }
 
+/* Neutral-skin a* baselines by Fitzpatrick type, and how much to trust the
+ * reading. Erythema is genuinely harder to detect through melanin in the
+ * visible spectrum — the honest response is to widen the baseline AND lower
+ * confidence for the darkest types, not to pretend one threshold fits everyone.
+ * A single hard-coded baseline (which is what this used to be) reads normal
+ * skin as inflamed for some people and misses real redness in others. */
+const TONE = {
+  1: { aBase: 11.0, confidence: 1.00 },
+  2: { aBase: 12.0, confidence: 1.00 },
+  3: { aBase: 13.0, confidence: 0.95 },
+  4: { aBase: 13.5, confidence: 0.85 },
+  5: { aBase: 13.0, confidence: 0.70 },
+  6: { aBase: 12.0, confidence: 0.55 },
+};
+const DEFAULT_TONE = { aBase: 12.5, confidence: 0.8 };
+
 /**
- * @param {ImageData} img  the captured still
- * @param {Array}     pts  raw normalised landmarks (NOT canonicalised — we need
- *                         positions in the original frame to index pixels)
+ * @param {ImageData} img      the captured still
+ * @param {Array}     pts      raw normalised landmarks (NOT canonicalised — we
+ *                             need positions in the original frame to index pixels)
+ * @param {object}    profile  questionnaire answers; `fitzpatrick` calibrates
+ *                             the redness baseline and the confidence figure
  */
-export function measureSkin(img, pts) {
+export function measureSkin(img, pts, profile = {}) {
   const { data, width: w, height: h } = img;
   const at = (i) => ({ x: pts[i].x * w, y: pts[i].y * h });
   const ipd = Math.hypot(at(L.L_EYE_IN).x - at(L.R_EYE_IN).x, at(L.L_EYE_IN).y - at(L.R_EYE_IN).y);
@@ -89,13 +107,19 @@ export function measureSkin(img, pts) {
                  (forehead ? Math.abs(cheekL_ - forehead.L) * 0.5 : 0);
   const evenness = round(within + across * 0.5, 2);
 
-  /* Redness / reactivity: cheek a* above a neutral-skin baseline of ~12. */
-  const redness = round(Math.max(0, cheekA - 12), 2);
+  /* Redness / reactivity: cheek a* above the neutral baseline for this skin
+     tone. Falls back to a mid baseline when the tone is unknown. */
+  const tone = TONE[profile.fitzpatrick] ?? DEFAULT_TONE;
+  const redness = round(Math.max(0, cheekA - tone.aBase), 2);
 
   return {
     underEye,
     evenness,
     redness,
+    /* How much this reading should be trusted. Surfaced in the UI rather than
+       hidden, because a confident wrong number is worse than an honest soft one. */
+    confidence: round(tone.confidence, 2),
+    toneKnown: profile.fitzpatrick != null,
     cheek: { L: round(cheekL_, 1), a: round(cheekA, 1), b: round(cheekB, 1) },
     // A rough exposure sanity check — the caller warns the user if it is off.
     exposure: round(cheekL_, 1),

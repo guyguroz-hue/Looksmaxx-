@@ -11,6 +11,11 @@ import { COST_LABEL, EVIDENCE_LABEL, protocol } from './content/protocols.js';
 import * as store from './lib/store.js';
 import { scoreRing, countUp, domainBars, progressLine, metricsTable } from './ui/charts.js';
 import { drawFaceOverlay, drawBodyOverlay } from './ui/overlay.js';
+import { mountQuiz } from './ui/quiz.js';
+import { mountAuth } from './ui/auth.js';
+import { deriveSelfReport, bundleFromResult } from './content/profileMetrics.js';
+import { isConfigured, currentUser, onAuthChange, saveScan, saveProfile } from './lib/supabase.js';
+import { isComplete } from './content/questionnaire.js';
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -19,12 +24,19 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
  *  ranges ("0–2"), signed deltas ("+30") and values with units ("1.7 מ״מ"). */
 const n = (v) => `<bdi class="n">${v}</bdi>`;
 
+const DOMAIN_LABELS = {
+  harmony: 'הרמוניה', symmetry: 'סימטריה', definition: 'הגדרה',
+  skin: 'עור', body: 'הרכב גוף', posture: 'יציבה',
+};
+
 /** Hebrew counts: "מדד אחד" for one, "2 מדדים" for the rest. */
 const plural = (count, one, many) => (count === 1 ? one : `${n(count)} ${many}`);
 
 /* Session-scoped capture results. Deliberately NOT persisted — the raw frames
    and landmarks die with the page; only the derived numbers are stored. */
 const capture = { face: null, skin: null, body: null, bodySide: null, stills: {} };
+/** The last assembled scoring bundle — the planner needs it for causal context. */
+let lastBundle = {};
 
 let currentScreen = 's-intro';
 let abort = null;
@@ -37,7 +49,7 @@ function show(id, { push = true } = {}) {
   if (currentScreen === 's-scan' && id !== 's-scan') stopScan();
   $$('.screen').forEach(s => s.classList.toggle('is-active', s.id === id));
   currentScreen = id;
-  $('#nav').hidden = (id === 's-intro');
+  $('#nav').hidden = (id === 's-intro' || id === 's-quiz');
   $$('.nav__btn').forEach(b => b.toggleAttribute('aria-current', b.dataset.nav === id));
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (push) history.replaceState({ id }, '', '#' + id.replace('s-', ''));
@@ -77,22 +89,62 @@ $$('.seg').forEach(btn => btn.addEventListener('click', () => {
 })();
 
 $('#go-scan').addEventListener('click', () => startFlow());
+(function labelIntroCta() {
+  const done = isComplete(store.get().profile);
+  const btn = $('#go-scan');
+  if (btn) btn.firstChild.textContent = done ? 'להתחיל סריקה ' : 'להתחיל — שאלון קצר ';
+})();
 
 /* ══════════════════════════ scan flow ══════════════════════════ */
 
-const STEPS = [
-  { key: 'face', n: 1, title: 'סריקת פנים',       sub: 'להחזיק את הטלפון בגובה העיניים, במרחק של כ-40 ס״מ, באור אחיד מלפנים.', facing: 'user' },
-  { key: 'front', n: 2, title: 'גוף — מלפנים',     sub: 'להניח את הטלפון ולהתרחק עד שכל הגוף נכנס למסגרת. עמידה טבעית, ידיים מעט מהגוף.', facing: 'environment' },
-  { key: 'side',  n: 3, title: 'גוף — מהצד',       sub: 'להסתובב 90°. זהו הצילום שחושף את זווית הראש-צוואר — המדד שמשנה את קו הלסת.', facing: 'environment' },
+/* The default scan is the face alone.
+ *
+ * Body shots were in here and came out: photographing your own full body needs
+ * a tripod, a timer and a mirror-free wall, and most people simply will not do
+ * it. The questionnaire recovers the important part — height, weight and a tape
+ * measure beat a self-taken photo at waist-to-hip anyway — and the body pass
+ * stays available for anyone who wants the posture metrics too. */
+const FACE_STEP  = { key: 'face',  title: 'סריקת פנים',   sub: 'להחזיק את הטלפון בגובה העיניים, במרחק של כ-40 ס״מ, באור אחיד מלפנים.', facing: 'user' };
+const BODY_STEPS = [
+  { key: 'front', title: 'גוף — מלפנים', sub: 'להניח את הטלפון ולהתרחק עד שכל הגוף נכנס למסגרת. עמידה טבעית, ידיים מעט מהגוף.', facing: 'environment' },
+  { key: 'side',  title: 'גוף — מהצד',   sub: 'להסתובב 90°. זהו הצילום שחושף את זווית הראש-צוואר — המדד שמשנה את קו הלסת.', facing: 'environment' },
 ];
+
+let STEPS = [FACE_STEP];
 let stepIndex = 0;
 
+/** The questionnaire comes first — it sets the target bands the scan is scored against. */
 async function startFlow() {
+  if (!isComplete(store.get().profile)) return startQuiz();
+  STEPS = [FACE_STEP];
   stepIndex = 0;
-  capture.face = capture.skin = capture.body = capture.bodySide = null;
+  capture.face = capture.skin = null;
   warmUp();
   show('s-scan');
   await runStep();
+}
+
+/** Opt-in second pass that unlocks the posture and body-shape metrics. */
+async function startBodyScan() {
+  STEPS = BODY_STEPS;
+  stepIndex = 0;
+  capture.body = capture.bodySide = null;
+  warmUp();
+  show('s-scan');
+  await runStep();
+}
+
+function startQuiz() {
+  show('s-quiz');
+  mountQuiz($('#quiz'), {
+    answers: store.get().profile,
+    onExit: () => show('s-intro'),
+    onDone: async (answers) => {
+      store.update(st => { st.profile = { ...st.profile, ...answers, onboarded: true }; });
+      if (await currentUser()) saveProfile(store.get().profile).catch(() => {});
+      startFlow();
+    },
+  });
 }
 
 function stopScan() { abort?.abort(); abort = null; cam.stop(); $('#stage').classList.remove('is-scanning', 'is-locked'); }
@@ -101,12 +153,14 @@ async function runStep() {
   const step = STEPS[stepIndex];
   if (!step) return finish();
 
-  $('#scan-step').textContent = `שלב ${step.n} מתוך ${STEPS.length}`;
+  $('#scan-step').textContent = STEPS.length > 1
+    ? `שלב ${stepIndex + 1} מתוך ${STEPS.length}`
+    : 'סריקה';
   $('#scan-h').textContent = step.title;
   $('#scan-sub').textContent = step.sub;
   $('#btn-capture').disabled = true;
   $('#btn-capture').textContent = 'מאתחל…';
-  $('#btn-skip').textContent = step.key === 'face' ? 'לדלג — אי אפשר לסרוק פנים' : 'לדלג על השלב';
+  $('#btn-skip').textContent = step.key === 'face' ? 'לא מצליח לסרוק — לדלג' : 'לדלג על השלב';
   $('#scan-prog').style.width = '0%';
   $('#qc').innerHTML = '';
   $('#hint').textContent = 'מאתחל מצלמה…';
@@ -136,7 +190,7 @@ async function runStep() {
 
   try {
     if (step.key === 'face') {
-      const r = await scanFace(cam, onTick, abort.signal);
+      const r = await scanFace(cam, onTick, abort.signal, store.get().profile);
       capture.face = r.face; capture.skin = r.skin;
       capture.stills.face = { still: r.still, landmarks: r.landmarks, face: r.face };
     } else {
@@ -192,27 +246,39 @@ function renderQC(q) {
   }
 }
 
+/** Everything the scorer reads, assembled from the scan and the questionnaire. */
+function currentBundle() {
+  const answers = store.get().profile;
+  const merged = capture.body || capture.bodySide
+    ? { ...(capture.body ?? {}),
+        ratios: { ...(capture.body?.ratios ?? {}) },
+        posture: { ...(capture.body?.posture ?? {}), ...(capture.bodySide?.posture ?? {}) } }
+    : undefined;
+  return {
+    face: capture.face ?? undefined,
+    skin: capture.skin ?? undefined,
+    body: merged,
+    self: deriveSelfReport(answers),     // BMI and tape measurements
+  };
+}
+
 function finish() {
   stopScan();
   if (!capture.face && !capture.body && !capture.bodySide) {
     toast('לא נקלטה אף סריקה');
     return show('s-intro');
   }
-  /* The side view supplies the posture metrics; merge it into one bundle so the
-     catalogue can read every path from a single object. */
-  const merged = capture.body || capture.bodySide
-    ? { ...(capture.body ?? {}),
-        ratios: { ...(capture.body?.ratios ?? {}) },
-        posture: { ...(capture.body?.posture ?? {}), ...(capture.bodySide?.posture ?? {}) } }
-    : undefined;
+  const answers = store.get().profile;
+  const bundle = currentBundle();
+  const result = scoreAll(bundle, answers);
+  lastBundle = bundle;
 
-  const result = scoreAll(
-    { face: capture.face ?? undefined, skin: capture.skin ?? undefined, body: merged },
-    store.get().profile,
-  );
   store.saveResult(result);
   renderResult(result);
   show('s-result');
+
+  // Best-effort cloud save; a failure never blocks the user seeing their result.
+  saveScan(result).catch(() => {});
 }
 
 /* ══════════════════════════ result ══════════════════════════ */
@@ -234,12 +300,13 @@ function renderResult(result) {
 
   domainBars($('#domain-bars'), result.domains, { onSelect: openDomain });
 
-  if (result.coverage.missingDomains.length) {
-    const note = document.createElement('p');
-    note.className = 'xs';
-    note.style.marginTop = '14px';
-    note.textContent = `לא נמדדו: ${result.coverage.missingDomains.join(', ')}. סריקה מלאה תיתן תמונה מדויקת יותר.`;
-    $('#domain-bars').after(note);
+  /* Locked domains are an invitation, not a failure — say so in those words. */
+  const unlock = $('#unlock-body');
+  if (unlock) {
+    const locked = result.coverage.lockedDomains ?? [];
+    unlock.hidden = locked.length === 0;
+    const label = unlock.querySelector('[data-unlock-text]');
+    if (label) label.textContent = `סריקת גוף אופציונלית תפתח ${result.coverage.unlockable} מדדים נוספים (${locked.join(' ו')}) — כולל זווית ראש-צוואר, שמשנה את מראה קו הלסת.`;
   }
 
   /* annotated still */
@@ -413,7 +480,11 @@ function openDomain(domainId) {
 function renderPlan() {
   const result = store.get().lastResult;
   if (!result) return;
-  const { plan, daily, horizon } = buildPlan(result);
+  /* After a reload the raw bundle is gone (it held the landmarks, and those are
+     never persisted) — so rebuild the handful of values the causal reasoning
+     needs from the stored result instead of silently losing the explanations. */
+  const bundle = lastBundle.face ? lastBundle : bundleFromResult(result);
+  const { plan, daily, horizon, context, unmeasuredConcerns } = buildPlan(result, bundle);
   const done = store.checkedToday();
 
   /* daily checklist */
@@ -443,6 +514,23 @@ function renderPlan() {
   $('#streak').innerHTML = st.count
     ? `<b class="num">${st.count}</b><span class="xs">ימים ברצף</span>`
     : `<span class="xs">להתחיל רצף</span>`;
+
+  /* Why the plan looks the way it does — the questionnaire's payoff, made visible. */
+  const notes = $('#plan-context');
+  if (notes) {
+    const blocks = context.notes.map(t => `<div class="callout" style="margin-bottom:10px">${t}</div>`);
+    // The user named something we never measured. Say so plainly and offer the fix.
+    if (unmeasuredConcerns.length) {
+      const names = unmeasuredConcerns.map(d => DOMAIN_LABELS[d] ?? d).join(' ו');
+      blocks.push(`<div class="callout callout--care" style="margin-bottom:10px">
+        ציינת ש<b>${names}</b> מה שהכי מפריע לך — אבל זה לא נמדד בסריקת הפנים.
+        <button class="btn btn--quiet" id="btn-body-scan-2" style="padding:0;min-height:0;text-decoration:underline">להוסיף סריקת גוף</button>
+      </div>`);
+    }
+    notes.innerHTML = blocks.join('');
+    notes.hidden = !blocks.length;
+    $('#btn-body-scan-2')?.addEventListener('click', () => startBodyScan());
+  }
 
   /* timeline */
   $('#timeline').innerHTML = horizon.map(g => `
@@ -505,11 +593,21 @@ $('#btn-export').addEventListener('click', () => {
   toast('הנתונים יוצאו');
 });
 
-$('#btn-wipe').addEventListener('click', () => {
+$('#btn-wipe').addEventListener('click', async () => {
   if (!confirm('למחוק את כל הנתונים? הפעולה אינה הפיכה.')) return;
+  // If there is an account, the cloud rows go too — a delete button that leaves
+  // data on a server is a lie.
+  try {
+    if (await currentUser()) {
+      const { deleteRemote } = await import('./lib/supabase.js');
+      await deleteRemote();
+    }
+  } catch { toast('המחיקה המקומית בוצעה; מחיקת הענן נכשלה'); }
   store.reset();
   capture.face = capture.skin = capture.body = capture.bodySide = null;
   capture.stills = {};
+  lastBundle = {};
+  refreshAuth?.();
   toast('הכול נמחק');
   show('s-intro');
 });
@@ -528,6 +626,8 @@ $('#btn-wipe').addEventListener('click', () => {
   if (Object.keys(o).length) setSources(o);
 })();
 
+let refreshAuth = null;
+
 (function boot() {
   const last = store.get().lastResult;
   if (last) {
@@ -535,5 +635,39 @@ $('#btn-wipe').addEventListener('click', () => {
     $('#annotated-card').hidden = true;   // the still is never persisted
     show('s-result', { push: false });
   }
+
+  // The account panel lives on the result screen and again under Progress.
+  const authMounts = [$('#auth'), $('#auth-progress')].filter(Boolean);
+  refreshAuth = () => authMounts.forEach(m => mountAuth(m, { onChange: () => renderProgress() }));
+  refreshAuth();
+
+  /* A magic link lands back on this page already authenticated, so the session
+     can appear without any click. Re-render and pull the history down. */
+  if (isConfigured()) {
+    onAuthChange(async (user) => {
+      refreshAuth();
+      if (!user) return;
+      toast('מחובר — מסנכרן');
+      try {
+        const { pushLocal, fetchAll } = await import('./lib/supabase.js');
+        const st = store.get();
+        await pushLocal({ answers: st.profile, history: st.history });
+        const remote = await fetchAll();
+        if (remote) store.update(x => {
+          const seen = new Set(x.history.map(h => h.at));
+          for (const h of remote.history) if (!seen.has(h.at)) x.history.push(h);
+          x.history.sort((a, b) => a.at - b.at);
+          if (remote.answers && Object.keys(remote.answers).length) {
+            x.profile = { ...remote.answers, ...x.profile };
+          }
+        });
+        renderProgress();
+      } catch { /* offline is not an error state here */ }
+    });
+  }
+
+  $('#btn-body-scan')?.addEventListener('click', () => startBodyScan());
+  $('#btn-edit-quiz')?.addEventListener('click', () => startQuiz());
+
   if ('requestIdleCallback' in window) requestIdleCallback(() => warmUp());
 })();

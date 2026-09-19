@@ -78,6 +78,8 @@ bdi.n { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-num
   padding-inline: var(--gutter);
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
 }
+/* Onboarding screens have no bottom nav, so they reclaim that space. */
+.app:has(#s-quiz.is-active), .app:has(#s-intro.is-active) { padding-bottom: 0; }
 .stack > * + * { margin-top: var(--sp-4); }
 .stack-lg > * + * { margin-top: var(--sp-6); }
 .row { display: flex; align-items: center; gap: var(--sp-3); }

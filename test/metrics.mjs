@@ -8,8 +8,10 @@ import { measureBody } from '../js/analysis/bodyMetrics.js';
 import { rgbToLab } from '../js/analysis/skin.js';
 import { scoreAll, rankOpportunities } from '../js/analysis/scoring.js';
 import { buildPlan } from '../js/content/planner.js';
-import { METRICS, METRIC_BY_ID, resolveBand } from '../js/content/metricsCatalog.js';
+import { METRICS, METRIC_BY_ID, resolveBand, readValue } from '../js/content/metricsCatalog.js';
 import { PROTOCOLS } from '../js/content/protocols.js';
+import { deriveSelfReport, deriveContext, bundleFromResult } from '../js/content/profileMetrics.js';
+import { STEPS as QSTEPS, ALL_QUESTIONS, isComplete, validate as qValidate, missingRequired } from '../js/content/questionnaire.js';
 import { bandScore, median } from '../js/analysis/geometry.js';
 
 let pass = 0, fail = 0;
@@ -105,13 +107,15 @@ t('every protocol carries evidence, cost, weeks and risk', () => {
 });
 
 console.log('\nscoring & planning');
+const ANSWERS = { age: 28, sex: 'm', height: 178, weight: 82, fitzpatrick: 2, spf: 'never', sleep: 5.5 };
 const bundle = {
   face: flat,
   skin: { underEye: { index: 9.5 }, evenness: 9.2, redness: 6.2 },
   body: { ratios: { shoulderToWaist: 1.30, waistToHip: 0.96, legToTorso: 1.2 },
           posture: { shoulderTilt: 5.5, hipTilt: 3.2, craniovertebral: 41, trunkLean: 7 } },
+  self: deriveSelfReport(ANSWERS),
 };
-const res = scoreAll(bundle, { sex: 'm' });
+const res = scoreAll(bundle, ANSWERS);
 t('overall score is in range', () => assert.ok(res.overall >= 0 && res.overall <= 100));
 t('potential is never below the score', () => assert.ok(res.potential >= res.overall));
 t('full bundle ⇒ 100% coverage', () => assert.equal(res.coverage.pct, 100));
@@ -125,7 +129,14 @@ t('lifestyle metrics with a gap DO have headroom', () => {
 t('a face-only scan degrades to partial coverage', () => {
   const partial = scoreAll({ face: flat }, { sex: 'x' });
   assert.ok(partial.coverage.pct < 100 && partial.overall != null);
-  assert.ok(partial.coverage.missingDomains.length > 0);
+});
+t('body-scan metrics report as locked, not merely missing', () => {
+  const faceOnly = scoreAll({ face: flat, skin: bundle.skin, self: deriveSelfReport(ANSWERS) }, ANSWERS);
+  assert.ok(faceOnly.coverage.unlockable > 0, 'nothing marked unlockable');
+  assert.ok(faceOnly.coverage.lockedDomains.includes('יציבה'));
+  // Coverage is measured against what the user was actually asked for, so a
+  // face-only scan must not read as badly incomplete.
+  assert.ok(faceOnly.coverage.pct >= 90, `face-only coverage was ${faceOnly.coverage.pct}%`);
 });
 t('an empty bundle does not throw', () => {
   const empty = scoreAll({}, { sex: 'x' });
@@ -151,6 +162,123 @@ t('a high scorer still gets a daily list', () => {
             posture: { shoulderTilt: 0.5, hipTilt: 0.4, craniovertebral: 62, trunkLean: 1 } } }, { sex: 'm' });
   assert.ok(buildPlan(great).daily.length >= 3);
 });
+
+
+
+console.log('\nquestionnaire');
+t('every question declares what it affects', () =>
+  ALL_QUESTIONS.forEach(q => assert.ok(q.affects?.length, `${q.id} affects nothing`)));
+t('question ids are unique', () => {
+  const ids = ALL_QUESTIONS.map(q => q.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+t('an empty form is incomplete', () => assert.equal(isComplete({}), false));
+t('the required fields alone complete it', () =>
+  assert.equal(isComplete({ age: 28, sex: 'm', height: 175, weight: 72, fitzpatrick: 3, spf: 'never', sleep: 7.5 }), true));
+t('out-of-range numbers are rejected', () => {
+  assert.ok(qValidate(ALL_QUESTIONS.find(q => q.id === 'age'), 200));
+  assert.equal(qValidate(ALL_QUESTIONS.find(q => q.id === 'age'), 28), null);
+});
+t('optional steps have no required fields', () =>
+  QSTEPS.filter(st => !st.required).forEach(st =>
+    assert.equal(missingRequired(st, {}).length, 0, st.id)));
+t('the pregnancy question only shows where relevant', () => {
+  const life = QSTEPS.find(st => st.id === 'life');
+  assert.equal(missingRequired(life, { sex: 'm' }).includes('pregnant'), false);
+});
+
+console.log('\nprofile-derived values');
+t('BMI is computed correctly', () => near(deriveSelfReport({ height: 180, weight: 81 }).bmi, 25.0, 0.1, 'bmi'));
+t('waist-to-hip comes from the tape measurements', () =>
+  near(deriveSelfReport({ waist: 80, hip: 100 }).waistToHip, 0.8, 0.001, 'whr'));
+t('a tape measurement beats a photo estimate', () =>
+  assert.equal(readValue({ self: { waistToHip: 0.75 }, body: { ratios: { waistToHip: 0.95 } } },
+    METRIC_BY_ID.waistToHip.from), 0.75));
+t('BMI is scored on the HEALTH band, not an aesthetic one', () => {
+  const [lo, hi] = resolveBand(METRIC_BY_ID.bmi, {});
+  assert.equal(lo, 18.5); assert.equal(hi, 24.9);
+});
+t('underweight scores WORSE than mid-range, never better', () => {
+  const m = METRIC_BY_ID.bmi, [lo, hi] = resolveBand(m, {});
+  assert.ok(bandScore(16, lo, hi, m.tol) < bandScore(22, lo, hi, m.tol));
+  assert.ok(bandScore(16, lo, hi, m.tol) < 50, 'BMI 16 must be scored as a problem');
+});
+t('the skin band widens with age', () => {
+  const young = resolveBand(METRIC_BY_ID.evenness, { age: 20 });
+  const older = resolveBand(METRIC_BY_ID.evenness, { age: 60 });
+  assert.ok(older[1] > young[1]);
+});
+
+console.log('\ncausal context');
+t('full face at a NORMAL BMI reads as fluid, not fat', () => {
+  const c = deriveContext({ height: 175, weight: 70 }, { face: { ratios: { facialRoundness: 0.8 } } });
+  assert.ok(c.flags.includes('puffiness_not_fat'));
+});
+t('full face at a HIGH BMI reads as adiposity', () => {
+  const c = deriveContext({ height: 175, weight: 95 }, { face: { ratios: { facialRoundness: 0.8 } } });
+  assert.ok(c.flags.includes('adiposity_driven'));
+});
+t('dark circles despite good sleep point elsewhere', () => {
+  const c = deriveContext({ sleep: 8.5 }, { skin: { underEye: { index: 8 } } });
+  assert.ok(c.flags.includes('undereye_not_sleep'));
+});
+t('the reasons behind a plan survive a reload', () => {
+  const a = { age: 29, sex: 'm', height: 178, weight: 84, fitzpatrick: 2, spf: 'never', sleep: 5.5 };
+  const live = { face: flat, skin: { underEye: { index: 8.4 }, evenness: 8.8, redness: 5.1 }, self: deriveSelfReport(a) };
+  const stored = JSON.parse(JSON.stringify(scoreAll(live, a)));   // what localStorage keeps
+  assert.deepEqual(deriveContext(a, bundleFromResult(stored)).flags, deriveContext(a, live).flags);
+});
+t('the rebuilt bundle carries no landmark data', () => {
+  const a = { age: 29, sex: 'm', height: 178, weight: 84, fitzpatrick: 2, spf: 'never', sleep: 5.5 };
+  const stored = JSON.parse(JSON.stringify(scoreAll({ face: flat, skin: { underEye: { index: 8 }, evenness: 8 }, self: deriveSelfReport(a) }, a)));
+  const json = JSON.stringify(bundleFromResult(stored));
+  assert.ok(!json.includes('_pts'), 'landmarks leaked into the rebuilt bundle');
+  assert.ok(json.length < 400, `rebuilt bundle unexpectedly large: ${json.length} bytes`);
+});
+
+console.log('\nsafety filters');
+const mk = (a) => { const b = { face: flat, skin: bundle.skin, self: deriveSelfReport(a) };
+  return buildPlan(scoreAll(b, a), b); };
+t('pregnancy removes retinoids entirely', () => {
+  const { plan, daily } = mk({ age: 31, sex: 'f', height: 165, weight: 60, fitzpatrick: 3, spf: 'never', sleep: 6.5, pregnant: 'yes' });
+  assert.ok(!plan.some(p => p.id === 'retinoid'), 'retinoid still in plan');
+  assert.ok(!daily.some(p => p.id === 'retinoid'), 'retinoid still in daily list');
+});
+t('an underweight user is never told to lose fat', () => {
+  const { plan, daily } = mk({ age: 19, sex: 'm', height: 180, weight: 55, fitzpatrick: 2, spf: 'never', sleep: 7.5 });
+  assert.ok(!plan.some(p => p.id === 'bodyfat'));
+  assert.ok(!daily.some(p => p.id === 'bodyfat'));
+});
+t('daily SPF users are not told to start using SPF', () => {
+  const { plan } = mk({ age: 30, sex: 'm', height: 175, weight: 72, fitzpatrick: 2, spf: 'daily', sleep: 7.5 });
+  const spf = plan.find(p => p.id === 'spf');
+  assert.ok(!spf || plan.indexOf(spf) > 3, 'SPF still ranked high for a daily user');
+});
+t('a stated concern always reaches the top 3', () => {
+  // Body composition dominates this persona's maths, so without the promotion
+  // rule a skin-focused user would see four body protocols first.
+  const base = { age: 30, sex: 'm', height: 175, weight: 88, fitzpatrick: 2, spf: 'sometimes', sleep: 7.5 };
+  const { plan } = mk({ ...base, concerns: ['skin'] });
+  const top3 = plan.slice(0, 3).map(p => p.domain);
+  assert.ok(top3.includes('skin'), `top 3 were ${top3.join(',')}`);
+});
+t('promotion does not drop the strongest lever', () => {
+  const base = { age: 30, sex: 'm', height: 175, weight: 88, fitzpatrick: 2, spf: 'sometimes', sleep: 7.5 };
+  const { plan } = mk({ ...base, concerns: ['skin'] });
+  assert.equal(plan[0].id, 'bodyfat', 'the evidence-led top pick was displaced');
+});
+t('a concern we cannot measure is reported, not silently dropped', () => {
+  const base = { age: 30, sex: 'm', height: 175, weight: 80, fitzpatrick: 2, spf: 'sometimes', sleep: 7.5 };
+  const { unmeasuredConcerns } = mk({ ...base, concerns: ['posture'] });
+  assert.ok(unmeasuredConcerns.includes('posture'));
+});
+t('no concerns ⇒ nothing reported as unmeasured', () => {
+  const base = { age: 30, sex: 'm', height: 175, weight: 80, fitzpatrick: 2, spf: 'sometimes', sleep: 7.5 };
+  assert.equal(mk(base).unmeasuredConcerns.length, 0);
+});
+t('the plan never contains a protocol filtered to zero', () =>
+  mk({ age: 31, sex: 'f', height: 165, weight: 60, fitzpatrick: 3, spf: 'never', sleep: 6.5, pregnant: 'yes' })
+    .plan.forEach(p => assert.ok(p.factor > 0, p.id)));
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

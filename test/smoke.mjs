@@ -36,6 +36,16 @@ const shots = [];
 const shot = async (name) => { const f = `/tmp/shot-${name}.png`; await page.screenshot({ path: f, fullPage: true }); shots.push(f); };
 await shot('1-intro');
 
+/* Walk the questionnaire: it is now the first thing a real user meets. */
+await page.click('#go-scan');
+await page.waitForTimeout(500);
+await shot('2-quiz');
+const quizProbe = await page.evaluate(() => ({
+  steps: document.querySelectorAll('.quiz__bar i').length,
+  fields: document.querySelectorAll('.qfield').length,
+  nextDisabled: document.querySelector('[data-next]')?.disabled,
+}));
+
 /* Feed a synthetic result through the real scoring + rendering path. */
 const injected = await page.evaluate(async () => {
   const [S, F, PL, store] = await Promise.all([
@@ -43,14 +53,17 @@ const injected = await page.evaluate(async () => {
     import('./js/content/planner.js'), import('./js/lib/store.js'),
   ]);
   const mk = (await import('./test/synthFace.js')).synthFace;
+  const { deriveSelfReport } = await import('./js/content/profileMetrics.js');
+  const answers = { age: 29, sex: 'm', height: 178, weight: 84, fitzpatrick: 2,
+                    spf: 'never', sleep: 5.5, activity: 'light', concerns: ['skin', 'jawline'] };
   const face = F.measureFace(mk(), 1000, 1000);
   const bundle = { face,
-    skin: { underEye: { index: 8.4 }, evenness: 8.8, redness: 5.1 },
-    body: { ratios: { shoulderToWaist: 1.38, waistToHip: 0.94, legToTorso: 1.18 },
-            posture: { shoulderTilt: 4.8, hipTilt: 2.9, craniovertebral: 43, trunkLean: 6.4 } } };
-  const r = S.scoreAll(bundle, { sex: 'm' });
+    skin: { underEye: { index: 8.4 }, evenness: 8.8, redness: 5.1, confidence: 1 },
+    self: deriveSelfReport(answers) };
+  const r = S.scoreAll(bundle, answers);
   const now = Date.now();
   store.update(s => {
+    s.profile = { ...answers, onboarded: true };
     s.lastResult = r;
     s.history = [-46, -32, -18, -7, 0].map((d, i) => ({
       at: now + d * 86400000,
@@ -59,19 +72,20 @@ const injected = await page.evaluate(async () => {
       domains: Object.fromEntries(Object.entries(r.domains).map(([k, v]) => [k, v.score])),
     }));
   });
-  const { plan, daily } = PL.buildPlan(r);
-  return { overall: r.overall, potential: r.potential, plan: plan.length, daily: daily.length };
+  const { plan, daily } = PL.buildPlan(r, bundle);
+  return { overall: r.overall, potential: r.potential, plan: plan.length, daily: daily.length,
+           coverage: r.coverage.pct, locked: r.coverage.unlockable };
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(1800);
-await shot('2-result');
+await shot('3-result');
 
-await page.click('[data-nav="s-plan"]'); await page.waitForTimeout(700); await shot('3-plan');
-await page.click('[data-nav="s-progress"]'); await page.waitForTimeout(700); await shot('4-progress');
+await page.click('[data-nav="s-plan"]'); await page.waitForTimeout(700); await shot('4-plan');
+await page.click('[data-nav="s-progress"]'); await page.waitForTimeout(700); await shot('5-progress');
 
 /* open a protocol sheet */
 await page.click('[data-nav="s-plan"]'); await page.waitForTimeout(400);
-await page.click('#plan-list .rowitem'); await page.waitForTimeout(600); await shot('5-sheet');
+await page.click('#plan-list .rowitem'); await page.waitForTimeout(600); await shot('6-sheet');
 
 /* horizontal overflow check on every screen */
 const overflow = await page.evaluate(() =>
@@ -79,6 +93,7 @@ const overflow = await page.evaluate(() =>
 
 await browser.close(); server.close();
 
+console.log('quiz screen   :', JSON.stringify(quizProbe), quizProbe.nextDisabled === true ? '(Continue correctly gated ✓)' : '(✗ Continue not gated)');
 console.log('injected      :', JSON.stringify(injected));
 console.log('h-overflow px :', overflow, overflow <= 0 ? '✓' : '✗ HORIZONTAL SCROLL');
 console.log('screenshots   :', shots.join(' '));

@@ -76,12 +76,19 @@ export const round = (v, d = 1) => { const k = 10 ** d; return Math.round(v * k)
  * Full marks anywhere inside [lo, hi]; a smooth cosine falloff outside it that
  * reaches 0 at `tol` beyond the edge. Deliberately gentle — a hard cliff would
  * make tiny measurement noise swing the score.
+ *
+ * `tol` may be a pair [below, above] when the two directions are not equally
+ * bad. BMI is the case that forces this: being underweight is a health problem,
+ * not a lesser version of being overweight, and a symmetric curve would quietly
+ * reward it.
  */
 export function bandScore(value, lo, hi, tol) {
   if (!Number.isFinite(value)) return null;
   if (value >= lo && value <= hi) return 100;
-  const d = value < lo ? lo - value : value - hi;
-  const t = clamp(d / tol);
+  const below = value < lo;
+  const d = below ? lo - value : value - hi;
+  const span = Array.isArray(tol) ? (below ? tol[0] : tol[1]) : tol;
+  const t = clamp(d / (span || 1e-9));
   return Math.round(100 * (0.5 + 0.5 * Math.cos(Math.PI * t)));
 }
 

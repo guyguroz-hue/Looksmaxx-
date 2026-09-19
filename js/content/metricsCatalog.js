@@ -15,6 +15,9 @@
 /** Target bands that depend on the subject's build. */
 const bySex = (m, f) => ({ __bySex: true, m, f, x: [(m[0] + f[0]) / 2, (m[1] + f[1]) / 2] });
 
+/** A band computed from the profile — used where age genuinely moves the target. */
+const byProfile = (fn) => ({ __byProfile: true, fn });
+
 export const DOMAINS = {
   harmony:   { id: 'harmony',   label: 'הרמוניה ופרופורציה', short: 'הרמוניה', weight: 1.0 },
   symmetry:  { id: 'symmetry',  label: 'סימטריה',            short: 'סימטריה', weight: 0.8 },
@@ -144,7 +147,10 @@ export const METRICS = [
   {
     id: 'evenness', domain: 'skin', from: 'skin.evenness',
     label: 'אחידות גוון העור', unit: '', dir: 'low',
-    band: [0, 6.5], tol: 9, mod: 'live', ev: 'A', weight: 1.15,
+    // Tone unevenness accumulates with sun-years; holding a 45-year-old to a
+    // 20-year-old's band would be measuring age, not skin care.
+    band: byProfile(p => [0, 6.0 + Math.max(0, ((p.age ?? 30) - 20)) * 0.07]),
+    tol: 9, mod: 'live', ev: 'A', weight: 1.15,
     what: 'פיזור הבהירות על פני העור — ככל שנמוך יותר, גוון העור אחיד יותר. מושפע מפיגמנטציה, נזקי שמש ומרקם.',
     note: 'שימוש יומיומי בקרם הגנה האט את הזדקנות העור ב-24% לעומת שימוש מזדמן (ניסוי מבוקר ארוך טווח).',
     protocols: ['spf', 'cleanse', 'moisturize', 'retinoid', 'vitc'],
@@ -159,7 +165,7 @@ export const METRICS = [
 
   /* ------------------------------ גוף ------------------------------ */
   {
-    id: 'shoulderToWaist', domain: 'body', from: 'body.ratios.shoulderToWaist',
+    id: 'shoulderToWaist', domain: 'body', needs: 'bodyScan', from: 'body.ratios.shoulderToWaist',
     label: 'יחס כתפיים-מותן', unit: '', dir: 'band',
     band: bySex([1.55, 1.85], [1.32, 1.55]), tol: 0.45, mod: 'live', ev: 'B', weight: 1.3,
     what: 'רוחב הכתפיים חלקי רוחב המותן — מדד ה"משולש ההפוך". אחד המנבאים החזקים ביותר למראה אתלטי אצל גברים.',
@@ -167,7 +173,7 @@ export const METRICS = [
     protocols: ['strength', 'shoulders', 'bodyfat', 'cardio'],
   },
   {
-    id: 'waistToHip', domain: 'body', from: 'body.ratios.waistToHip',
+    id: 'waistToHip', domain: 'body', from: ['self.waistToHip', 'body.ratios.waistToHip'],
     label: 'יחס מותן-ירך', unit: '', dir: 'band',
     band: bySex([0.83, 0.93], [0.66, 0.78]), tol: 0.22, mod: 'live', ev: 'A', weight: 1.2,
     what: 'מדד בריאותי ואסתטי מבוסס מחקר. אצל נשים יחס סביב 0.7 נמצא כנתפס כאטרקטיבי ביותר במחקרים בין-תרבותיים.',
@@ -175,30 +181,51 @@ export const METRICS = [
     protocols: ['bodyfat', 'cardio', 'nutrition', 'core'],
   },
   {
-    id: 'legToTorso', domain: 'body', from: 'body.ratios.legToTorso',
+    id: 'legToTorso', domain: 'body', needs: 'bodyScan', from: 'body.ratios.legToTorso',
     label: 'יחס רגליים-פלג גוף עליון', unit: '', dir: 'band',
     band: [1.05, 1.40], tol: 0.45, mod: 'fixed', ev: 'C', weight: 0.5,
     what: 'פרופורציה שלדית שאינה ניתנת לשינוי — אך ניתנת להדגשה משמעותית דרך גזרת ביגוד וגובה קו המותן.',
     protocols: ['clothing_fit', 'clothing_proportion'],
   },
 
+  {
+    id: 'bmi', domain: 'body', from: 'self.bmi', source: 'self',
+    label: 'מדד מסת גוף (BMI)', unit: '', dir: 'band',
+    // Deliberately the HEALTH range, not the "most attractive" range that shows
+    // up in the attractiveness literature. Scoring a person higher for being
+    // underweight is a feature with a body count; the asymmetric tolerance
+    // makes the low side fall away faster than the high side.
+    band: [18.5, 24.9], tol: [4, 8], mod: 'live', ev: 'A', weight: 1.1,
+    what: 'גובה ומשקל ביחד. משמש כאן כמדד בריאות ולא כיעד אסתטי — ירידה מתחת ל-18.5 מורידה את הציון בדיוק כמו עלייה מעליו.',
+    note: 'ה-BMI לא מבחין בין שריר לשומן. אם אתה מתאמן בכוח באופן קבוע, ייתכן שהערך גבוה בלי שזה מעיד על שומן עודף.',
+    protocols: ['bodyfat', 'nutrition', 'cardio', 'strength'],
+  },
+  {
+    id: 'sleepHours', domain: 'skin', from: 'self.sleepHours', source: 'self',
+    label: 'שעות שינה', unit: ' ש׳', dir: 'band',
+    band: [7, 9], tol: [3, 2], mod: 'live', ev: 'A', weight: 1.0,
+    what: 'שעות שינה ממוצעות בלילה. המנוף המהיר ביותר על מראה הפנים מכל מה שנמדד כאן.',
+    note: 'ניסוי מבוקר הראה שאותם אנשים עצמם דורגו כפחות בריאים ופחות אטרקטיביים לאחר לילה ללא שינה.',
+    protocols: ['sleep', 'eye_care', 'hydration'],
+  },
+
   /* ------------------------------ יציבה ------------------------------ */
   {
-    id: 'shoulderTilt', domain: 'posture', from: 'body.posture.shoulderTilt',
+    id: 'shoulderTilt', domain: 'posture', needs: 'bodyScan', from: 'body.posture.shoulderTilt',
     label: 'הטיית כתפיים', unit: '°', dir: 'low',
     band: [0, 2.5], tol: 7, mod: 'live', ev: 'B', weight: 1.0,
     what: 'סטיית קו הכתפיים מהאופק. הטיה קבועה מצביעה על חוסר איזון שרירי או נשיאת משקל חד-צדדית.',
     protocols: ['posture_program', 'unilateral_load', 'strength'],
   },
   {
-    id: 'hipTilt', domain: 'posture', from: 'body.posture.hipTilt',
+    id: 'hipTilt', domain: 'posture', needs: 'bodyScan', from: 'body.posture.hipTilt',
     label: 'הטיית אגן', unit: '°', dir: 'low',
     band: [0, 2.5], tol: 7, mod: 'live', ev: 'B', weight: 0.85,
     what: 'סטיית קו האגן מהאופק.',
     protocols: ['posture_program', 'core'],
   },
   {
-    id: 'craniovertebral', domain: 'posture', from: 'body.posture.craniovertebral',
+    id: 'craniovertebral', domain: 'posture', needs: 'bodyScan', from: 'body.posture.craniovertebral',
     label: 'זווית ראש-צוואר', unit: '°', dir: 'high',
     band: [50, 90], tol: 22, mod: 'live', ev: 'A', weight: 1.2, view: 'side',
     what: 'המדד הקליני המקובל ל"ראש קדמי". מתחת ל-50° מעיד על הסטת ראש קדימה — משפיע על קו הלסת והצוואר במראה חזיתי.',
@@ -206,7 +233,7 @@ export const METRICS = [
     protocols: ['posture_program', 'chin_tuck', 'desk_setup'],
   },
   {
-    id: 'trunkLean', domain: 'posture', from: 'body.posture.trunkLean',
+    id: 'trunkLean', domain: 'posture', needs: 'bodyScan', from: 'body.posture.trunkLean',
     label: 'נטיית גו', unit: '°', dir: 'low',
     band: [0, 4], tol: 12, mod: 'live', ev: 'B', weight: 0.7, view: 'side',
     what: 'סטיית פלג הגוף העליון מהאנך בעמידה טבעית.',
@@ -216,13 +243,29 @@ export const METRICS = [
 
 export const METRIC_BY_ID = Object.fromEntries(METRICS.map(m => [m.id, m]));
 
-/** Resolve a possibly sex-dependent band. */
-export function resolveBand(metric, sex = 'x') {
+/**
+ * Resolve a band against the profile. Accepts a plain pair, a sex-dependent
+ * band, or a function of the profile.
+ * @param {object|string} profile  the answers object (a bare sex string is
+ *        still accepted so older call sites keep working)
+ */
+export function resolveBand(metric, profile = {}) {
+  const p = typeof profile === 'string' ? { sex: profile } : (profile ?? {});
   const b = metric.band;
-  return b && b.__bySex ? (b[sex] ?? b.x) : b;
+  if (!b) return b;
+  if (b.__byProfile) return b.fn(p);
+  if (b.__bySex) return b[p.sex ?? 'x'] ?? b.x;
+  return b;
 }
 
-/** Read a dotted path out of the measurement bundle. */
-export function readValue(bundle, path) {
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), bundle);
+/** Read a dotted path out of the bundle. `from` may be a list of candidate
+ *  paths — the first one that resolves wins, which is how a tape-measure
+ *  answer takes precedence over a photo estimate of the same quantity. */
+export function readValue(bundle, from) {
+  const paths = Array.isArray(from) ? from : [from];
+  for (const path of paths) {
+    const v = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), bundle);
+    if (v != null && Number.isFinite(v)) return v;
+  }
+  return undefined;
 }

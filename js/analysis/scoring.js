@@ -19,20 +19,24 @@ export const BANDS = [
 export const bandOf = (score) => BANDS.find(b => score >= b.min) ?? BANDS[BANDS.length - 1];
 
 /**
- * @param {object} bundle  { face, skin, body, bodySide }
- * @param {object} profile { sex: 'm'|'f'|'x' }
+ * @param {object} bundle   { face, skin, body, self }
+ * @param {object} profile  the questionnaire answers
  */
 export function scoreAll(bundle, profile = {}) {
-  const sex = profile.sex ?? 'x';
   const metrics = [];
 
   for (const def of METRICS) {
     const raw = readValue(bundle, def.from);
     if (raw == null || !Number.isFinite(raw)) {
-      metrics.push({ ...def, value: null, score: null, available: false });
+      /* Distinguish "you haven't unlocked this yet" from "we couldn't read it".
+         The first is an invitation; the second is a failure. */
+      metrics.push({
+        ...def, value: null, score: null, available: false,
+        locked: def.needs === 'bodyScan' ? 'bodyScan' : null,
+      });
       continue;
     }
-    const [lo, hi] = resolveBand(def, sex);
+    const [lo, hi] = resolveBand(def, profile);
     const score = bandScore(raw, lo, hi, def.tol);
 
     /* Where inside / outside the band the value sits, for the bar's fill.
@@ -58,12 +62,16 @@ export function scoreAll(bundle, profile = {}) {
     const covered = metrics.filter(m => m.domain === key);
     const score = weightedMean(list.map(m => ({ value: m.score, weight: m.weight })));
     const potential = weightedMean(list.map(m => ({ value: m.potential, weight: m.weight })));
+    const locked = covered.filter(m => !m.available && m.locked);
     domains[key] = {
       ...DOMAINS[key],
       score: score == null ? null : Math.round(score),
       potential: potential == null ? null : Math.round(potential),
       measured: list.length, total: covered.length,
-      complete: list.length === covered.length,
+      lockedCount: locked.length,
+      /* A domain whose only gaps are locked extras is "complete for now" —
+         the bars should not nag about something the user has not been asked for. */
+      complete: list.length + locked.length === covered.length,
       metrics: metrics.filter(m => m.domain === key),
     };
   }
@@ -75,6 +83,7 @@ export function scoreAll(bundle, profile = {}) {
   /* Coverage tells the user how much of the picture they have actually captured —
      a score from a face scan alone is not the same claim as a full scan. */
   const measured = metrics.filter(m => m.available).length;
+  const unlockable = metrics.filter(m => !m.available && m.locked === 'bodyScan').length;
 
   return {
     overall: overall == null ? null : Math.round(overall),
@@ -84,9 +93,15 @@ export function scoreAll(bundle, profile = {}) {
     metrics,
     coverage: {
       measured, total: metrics.length,
-      pct: Math.round((measured / metrics.length) * 100),
-      missingDomains: Object.values(domains).filter(d => d.score == null).map(d => d.short),
+      unlockable,
+      /* Coverage is reported against what the user has actually been asked to
+         provide, so a face-only scan does not read as 70% "incomplete". */
+      pct: Math.round((measured / Math.max(1, metrics.length - unlockable)) * 100),
+      pctOfAll: Math.round((measured / metrics.length) * 100),
+      missingDomains: Object.values(domains).filter(d => d.score == null && !d.lockedCount).map(d => d.short),
+      lockedDomains: Object.values(domains).filter(d => d.score == null && d.lockedCount).map(d => d.short),
     },
+    profile,
     at: Date.now(),
   };
 }

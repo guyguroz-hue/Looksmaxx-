@@ -127,3 +127,86 @@
   :root { --app-max: 620px; }
   .hero-intro { padding-block: var(--sp-8) var(--sp-6); }
 }
+
+/* ===================== questionnaire ===================== */
+.quiz { padding-block: var(--sp-6) 0; }
+
+.quiz__bar { display: flex; gap: 5px; margin-block-end: var(--sp-6); }
+.quiz__bar i {
+  flex: 1; height: 3px; border-radius: 2px; background: var(--surface-3);
+  transition: background-color .35s var(--ease);
+}
+.quiz__bar i.is-done { background: var(--accent-deep); }
+.quiz__bar i.is-now  { background: var(--accent); }
+
+.quiz__head { display: grid; gap: var(--sp-2); margin-block-end: var(--sp-6); }
+.quiz__head h1 { font-size: var(--fs-h1); }
+.quiz__head .lede { font-size: var(--fs-sm); max-width: 40ch; }
+
+.quiz__fields { display: grid; gap: var(--sp-6); }
+.quiz__actions {
+  display: grid; gap: var(--sp-2);
+  margin-block: var(--sp-7) 0;
+  padding-block-end: calc(var(--sp-7) + env(safe-area-inset-bottom));
+}
+
+.qfield { display: grid; gap: var(--sp-2); }
+.qfield__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.qfield__label { font-weight: 600; font-size: var(--fs-body); }
+.qfield__why {
+  font-size: var(--fs-xs); color: var(--ink-3); flex: none;
+  border-block-end: 1px dashed var(--line); padding-block-end: 1px;
+}
+.qfield__why:hover { color: var(--accent-strong); border-color: var(--accent-line); }
+.qfield__help {
+  font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.5;
+  border-inline-start: 2px solid var(--accent-line); padding-inline-start: var(--sp-3);
+  animation: screen-in .25s var(--ease) both;
+}
+.qfield__err { font-size: var(--fs-xs); color: var(--st-focus-ink); min-height: 1em; }
+.qfield__err:empty { min-height: 0; }
+
+/* number entry — big, with the unit pinned so it never wraps */
+.qnum { display: flex; align-items: center; gap: var(--sp-3); }
+.qnum__input {
+  flex: 1; min-width: 0; min-height: 56px; padding-inline: var(--sp-4);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  font-family: var(--font-mono); font-size: 1.3rem; font-variant-numeric: tabular-nums;
+  direction: ltr; text-align: start;
+  transition: border-color .2s, background-color .2s;
+}
+.qnum__input:focus { border-color: var(--accent); background: var(--surface-3); outline: none; }
+.qnum__input::-webkit-outer-spin-button, .qnum__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qnum__input[type=number] { -moz-appearance: textfield; }
+.qnum__unit { font-size: var(--fs-sm); color: var(--ink-3); flex: none; }
+/* A placeholder at this size is easily mistaken for an entered value. */
+.qnum__input::placeholder { color: var(--ink-3); opacity: .45; }
+
+/* choices — a stack on mobile, never a cramped row */
+.qchoices { display: grid; gap: var(--sp-2); }
+.qchoice {
+  display: grid; gap: 2px; text-align: start;
+  padding: 13px var(--sp-4); border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: border-color .18s, background-color .18s, transform .14s var(--ease);
+}
+.qchoice:active { transform: scale(.99); }
+.qchoice:hover { border-color: var(--accent-line); }
+.qchoice[aria-checked="true"], .qchoice[aria-pressed="true"] {
+  border-color: var(--accent); background: var(--accent-wash);
+}
+.qchoice__label { font-weight: 600; font-size: var(--fs-sm); }
+.qchoice__note { font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.4; }
+.qchoices--multi { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 380px) { .qchoices--multi { grid-template-columns: 1fr; } }
+
+/* ===================== auth ===================== */
+.authform { display: grid; gap: var(--sp-2); }
+.authform input {
+  min-height: 52px; padding-inline: var(--sp-4);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  font-size: var(--fs-body); direction: ltr; text-align: start;
+  transition: border-color .2s, background-color .2s;
+}
+.authform input:focus { border-color: var(--accent); background: var(--surface-3); outline: none; }
+.authform input::placeholder { color: var(--ink-3); }

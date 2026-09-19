@@ -63,7 +63,7 @@ function fuse(samples) {
  * @param {(state)=>void} onTick  called every frame with live quality + progress
  * @returns {Promise<{face, skin, frames, still}>}
  */
-export async function scanFace(cam, onTick, signal) {
+export async function scanFace(cam, onTick, signal, profile = {}) {
   const detector = await faceLandmarker();
   const samples = [];
   let lastLandmarks = null, lastQuality = null;
@@ -104,7 +104,7 @@ export async function scanFace(cam, onTick, signal) {
 
   /* One still, un-mirrored, for the pixel work and the annotated report. */
   const still = cam.grab({ mirror: false });
-  const skin = lastLandmarks ? measureSkin(still.imageData, lastLandmarks) : null;
+  const skin = lastLandmarks ? measureSkin(still.imageData, lastLandmarks, profile) : null;
 
   return {
     face: fuse(samples),

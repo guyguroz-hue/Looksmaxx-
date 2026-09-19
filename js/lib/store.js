@@ -6,7 +6,7 @@ const KEY = 'looksmaxx.v1';
 const MAX_HISTORY = 60;
 
 const blank = () => ({
-  profile: { sex: 'x', onboarded: false },
+  profile: { onboarded: false },   // no pre-selected answers — every one must be chosen
   history: [],            // [{ at, overall, potential, domains:{k:score}, coverage }]
   lastResult: null,       // the full result object of the most recent scan
   checks: {},             // { 'YYYY-MM-DD': [protocolId, ...] }

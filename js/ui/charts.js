@@ -122,12 +122,21 @@ export function domainBars(mount, domains, { onSelect } = {}) {
     tick.title = 'יעד';
     track.append(fill, tick);
 
+    /* Separate "not measured yet" from "optional extra". A domain reading
+       1/4 looks like a failure; 1/2 measured with 2 optional reads as a choice. */
+    const locked = d.lockedCount ?? 0;
+    const asked = d.total - locked;
+    const counted = asked === d.measured
+      ? `${d.measured} מדדים`
+      : `${d.measured}/${asked} מדדים`;
+    const extra = locked ? ` · ${locked} נוספים בסריקת גוף` : '';
+
     const note = document.createElement('div');
     note.className = 'bar-note';
     note.textContent = d.score == null
-      ? `דורש סריקה נוספת (${d.measured}/${d.total} מדדים)`
-      : d.potential > d.score ? `פוטנציאל ${d.potential} · ${d.measured}/${d.total} מדדים`
-      : `${d.measured}/${d.total} מדדים`;
+      ? (locked ? `נפתח עם סריקת גוף (${locked} מדדים)` : `לא נמדד`)
+      : d.potential > d.score ? `פוטנציאל ${d.potential} · ${counted}${extra}`
+      : `${counted}${extra}`;
 
     row.append(head, track, note);
     mount.append(row);
