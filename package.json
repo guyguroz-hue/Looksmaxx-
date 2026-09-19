@@ -1,0 +1,16 @@
+{
+  "name": "looksmaxx",
+  "version": "1.0.0",
+  "description": "מכשיר מדידה למראה — סריקת פנים וגוף בדפדפן, מדידה במילימטרים ותוכנית שיפור לא-ניתוחית מבוססת ראיות.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes http-server . -p 8080 -c-1 -o",
+    "test": "node test/metrics.mjs && node test/smoke.mjs",
+    "test:metrics": "node test/metrics.mjs",
+    "test:browser": "node test/smoke.mjs",
+    "test:pipeline": "node test/pipeline.mjs"
+  },
+  "keywords": ["mediapipe", "face-landmarks", "on-device", "privacy", "anthropometry"],
+  "license": "MIT"
+}

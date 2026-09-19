@@ -1,0 +1,95 @@
+/* ============================================================
+   Looksmaxx · Design tokens
+   Concept: "מכשיר מדידה" — instrument-grade, editorial, warm dark.
+   Data palette validated with the dataviz six-checks validator
+   (dark surface #12151A, all checks PASS).
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* --- surfaces (warm near-black, not blue-black) --- */
+  --bg:            #0A0C0E;
+  --surface-1:     #12151A;   /* card / chart surface (validated against) */
+  --surface-2:     #171B21;   /* raised */
+  --surface-3:     #1E242B;   /* input / inset */
+  --line:          #262D35;   /* hairline border */
+  --line-soft:     #1A2027;
+
+  /* --- ink (bone, warm) --- */
+  --ink:           #ECE7DC;
+  --ink-2:         #A7ACA6;
+  --ink-3:         #6E7570;
+  --ink-inverse:   #0A0C0E;
+
+  /* --- sequential data ramp · single hue H=172 · monotone L ---
+     Ordinal check: PASS (monotone, ΔL ≥ .06, light end 3.83:1) */
+  --seq-100: #004f3e;
+  --seq-200: #006952;
+  --seq-300: #008268;
+  --seq-400: #269b7e;
+  --seq-500: #4db497;
+  --seq-600: #7cc9b1;
+  --seq-700: #a9decc;
+
+  /* brand accent == the data hue (one-hue system, no hue soup) */
+  --accent:        #4db497;
+  --accent-strong: #7cc9b1;
+  --accent-deep:   #269b7e;
+  --accent-wash:   rgba(77, 180, 151, .12);
+  --accent-line:   rgba(77, 180, 151, .28);
+
+  /* --- status · RESERVED, never used as a series colour ---
+     Trio validated all-pairs: CVD ΔE 10.8 · normal ΔE 16.4 · PASS
+     Always shipped with an icon + label, never colour alone. */
+  --st-good:       #269b7e;
+  --st-watch:      #ba770a;
+  --st-focus:      #b5333b;
+  /* lighter steps for status *text* (contrast on --bg) */
+  --st-good-ink:   #7cc9b1;
+  --st-watch-ink:  #e0a93f;
+  --st-focus-ink:  #e6857f;
+  --st-good-wash:  rgba(38, 155, 126, .13);
+  --st-watch-wash: rgba(186, 119, 10, .14);
+  --st-focus-wash: rgba(181, 51, 59, .15);
+
+  /* --- type --- */
+  --font-display: "Frank Ruhl Libre", "Noto Serif Hebrew", Georgia, serif;
+  --font-ui:      "Heebo", "Noto Sans Hebrew", system-ui, -apple-system, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --fs-display: clamp(2.6rem, 9vw, 3.8rem);
+  --fs-h1:      clamp(1.7rem, 5.4vw, 2.3rem);
+  --fs-h2:      clamp(1.22rem, 3.8vw, 1.45rem);
+  --fs-h3:      1.02rem;
+  --fs-body:    0.975rem;
+  --fs-sm:      0.855rem;
+  --fs-xs:      0.755rem;
+
+  /* --- space / shape --- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+  --r-sm: 8px;  --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-full: 999px;
+  --gutter: 16px;
+  --app-max: 560px;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 8px 28px -12px rgba(0,0,0,.75);
+  --shadow-3: 0 24px 60px -20px rgba(0,0,0,.85);
+
+  --ease: cubic-bezier(.22,.61,.36,1);
+  --ease-out-expo: cubic-bezier(.16,1,.3,1);
+}
+
+/* The app is dark by design (it is a camera instrument — a bright UI
+   wrecks the preview and the reference photos). A light stamp is still
+   honoured for readers who force it. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F4F1EA; --surface-1: #FFFFFF; --surface-2: #FAF8F3; --surface-3: #EFEBE2;
+  --line: #DED8CC; --line-soft: #E9E4D9;
+  --ink: #15171A; --ink-2: #545A55; --ink-3: #7C837D; --ink-inverse: #FFFFFF;
+  --accent: #0d7a62; --accent-strong: #0a6350; --accent-deep: #085746;
+  --accent-wash: rgba(13,122,98,.10); --accent-line: rgba(13,122,98,.3);
+  --st-good-ink: #0a6350; --st-watch-ink: #8a5806; --st-focus-ink: #99262e;
+}

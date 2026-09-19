@@ -1,0 +1,16 @@
+{
+  "name": "Looksmaxx — מכשיר מדידה למראה",
+  "short_name": "Looksmaxx",
+  "description": "סריקת פנים וגוף במכשיר שלך, מדידה במילימטרים ותוכנית שיפור לא-ניתוחית מבוססת ראיות.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0C0E",
+  "theme_color": "#0A0C0E",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
