@@ -1,0 +1,37 @@
+name: CI
+
+# Deployment is handled by Vercel, which builds straight from git.
+# This workflow only guards the code.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Measurement-engine tests
+        run: node test/metrics.mjs
+
+      - name: Install Chromium
+        run: npm i -D playwright@1.56.1 && npx playwright install --with-deps chromium
+
+      - name: Browser smoke test
+        run: node test/smoke.mjs
+
+      - name: Real MediaPipe pipeline
+        run: |
+          curl -sL https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-0.10.21.tgz | tar xz
+          curl -sL -o package/face_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          curl -sL -o package/pose_landmarker_full.task \
+            https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+          MP_DIR=$PWD/package node test/pipeline.mjs
