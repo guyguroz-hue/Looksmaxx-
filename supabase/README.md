@@ -1,54 +1,63 @@
 # Cloud sync setup
 
-Optional. Skip all of this and the app works exactly as before — everything in
-`localStorage`, nothing leaves the device.
+Optional. Without it the app works completely — everything stays in
+`localStorage` and the account panel says so.
 
-## 1. Create the project
+## 1 · Install the schema
 
-[supabase.com](https://supabase.com) → New project. The free tier covers this
-app comfortably: the schema stores a few hundred bytes per scan, so the 500 MB
-database ceiling is thousands of users deep.
+Supabase dashboard → **SQL Editor** → New query → paste all of
+[`migrations/0001_form_schema.sql`](migrations/0001_form_schema.sql) → **Run**.
 
-## 2. Install the schema
+This creates three tables **and their row-level-security policies**. Do not skip
+it. The anon key that ships in client code is public by design, and RLS is the
+only thing standing between it and everyone else's rows.
 
-Dashboard → **SQL Editor** → New query → paste all of `schema.sql` → Run.
+It is safe to run more than once — every policy and trigger is dropped and
+recreated, and the tables use `create table if not exists`.
 
-This creates both tables **and their row-level-security policies**. Do not skip
-it: the anon key in client code is public by design, and RLS is the only thing
-standing between it and everyone else's rows.
+## 2 · Point the app at the project
 
-## 3. Configure the client
+Dashboard → **Project Settings → API**, then set these as environment variables
+(Vercel: Project → Settings → Environment Variables):
 
-Settings → API, then fill in `js/config.js`:
-
-```js
-export const SUPABASE_URL = 'https://xxxxx.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGci...';
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
-Or per-deployment, without editing the file:
+Locally, copy `.env.example` to `.env.local` and fill the same two values.
 
-```html
-<body data-supabase-url="https://xxxxx.supabase.co" data-supabase-key="eyJhbGci...">
-```
+Use the **anon** key. Never put the `service_role` key in client code — it
+bypasses RLS entirely and would expose every row to anyone who opens devtools.
 
-The `anon` key is the public one. Never put the `service_role` key in client
-code — it bypasses RLS entirely.
+## 3 · Make the sign-in link come back to your site
 
-## 4. Point the magic link back at your site
+Dashboard → **Authentication → URL Configuration**:
 
-Authentication → URL Configuration → **Site URL**: your deployed origin
-(e.g. `https://looksmaxx-seven.vercel.app`), and add it under Redirect URLs.
-Without this the sign-in link will bounce people to localhost.
+- **Site URL**: your deployed origin, e.g. `https://looksmaxx-seven.vercel.app`
+- **Redirect URLs**: add the same origin, plus `http://localhost:3000` for local work
+
+Without this the magic link sends people to localhost.
 
 ## What syncs
 
-| Synced | Not synced |
+| Synced | Never synced |
 |---|---|
-| Questionnaire answers | Photos and video frames |
-| Score, potential, coverage | Face/pose landmarks |
-| Per-domain and per-metric scores | Anything that could reconstruct a face |
+| Onboarding preferences | Photos and video frames |
+| Observations and their evidence | Face landmarks |
+| Strengths and recommendations as shown | Anything that could reconstruct a face |
+| Saved / tried / dismissed state | |
 
-The `scans` table has no column capable of holding an image. That is deliberate
-— the privacy promise is enforced by the schema, not by client-side good
+The `analyses` table has no column capable of holding an image. That is the
+point: the privacy promise is enforced by the schema, not by client-side good
 intentions.
+
+## Verifying the policies
+
+```bash
+bash test/rls.sh
+```
+
+Applies the schema to a local PostgreSQL and proves eight isolation properties —
+that one user cannot read, insert, update or delete another's rows, and that an
+unauthenticated caller sees nothing at all.

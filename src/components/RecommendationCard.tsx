@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Recommendation } from '@/lib/analysis/types';
+import { saveState } from '@/lib/supabase/sync';
 import { CATEGORY_LABEL } from '@/lib/analysis/pipeline';
 import { ConfidenceIndicator, EffortIndicator, ImpactIndicator } from './ui/Indicator';
 
@@ -99,7 +100,10 @@ export function RecommendationCard({
               <div className="mt-5 flex gap-2">
                 <button
                   type="button"
-                  onClick={onDone}
+                  onClick={() => {
+                    onDone();
+                    void saveState([{ id: rec.id, category: rec.category, state: 'tried' }]).catch(() => {});
+                  }}
                   aria-pressed={done}
                   className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                     done
@@ -111,7 +115,10 @@ export function RecommendationCard({
                 </button>
                 <button
                   type="button"
-                  onClick={onSave}
+                  onClick={() => {
+                    onSave();
+                    void saveState([{ id: rec.id, category: rec.category, state: 'saved' }]).catch(() => {});
+                  }}
                   aria-pressed={saved}
                   className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                     saved

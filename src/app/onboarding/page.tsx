@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/Label';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/lib/store';
 import type { Category, UserPreferences } from '@/lib/analysis/types';
+import { saveProfile } from '@/lib/supabase/sync';
 
 const GOALS: { id: Category; label: string; hint: string }[] = [
   { id: 'hair', label: 'Hair', hint: 'Shape and framing' },
@@ -38,10 +39,9 @@ export default function OnboardingPage() {
     setGoals((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
 
   const finish = () => {
-    update({
-      preferences: { ...session.preferences, goals, style, wearsGlasses: glasses },
-      onboarded: true,
-    });
+    const preferences = { ...session.preferences, goals, style, wearsGlasses: glasses };
+    update({ preferences, onboarded: true });
+    void saveProfile(preferences).catch(() => {});   // no-op when signed out
     router.push('/scan');
   };
 

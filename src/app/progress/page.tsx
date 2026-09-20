@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/Label';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/lib/store';
 import { CATEGORY_LABEL } from '@/lib/analysis/pipeline';
+import { AccountPanel } from '@/components/AccountPanel';
+import { deleteEverything } from '@/lib/supabase/sync';
 
 /**
  * Progress (§18).
@@ -116,6 +118,8 @@ export default function ProgressPage() {
         </div>
       )}
 
+      <AccountPanel />
+
       <section className="mt-16 border-t border-hairline pt-8" aria-labelledby="data-h">
         <h2 id="data-h" className="text-sm font-semibold text-ink">Your data</h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-muted">
@@ -126,8 +130,12 @@ export default function ProgressPage() {
           <Button
             variant="secondary"
             size="md"
-            onClick={() => {
-              if (confirm('Delete everything FORM has stored? This cannot be undone.')) reset();
+            onClick={async () => {
+              if (!confirm('Delete everything FORM has stored? This cannot be undone.')) return;
+              // Remote rows go too — a delete button that leaves data on a
+              // server is a lie.
+              try { await deleteEverything(); } catch { /* local delete still proceeds */ }
+              reset();
             }}
           >
             Delete everything

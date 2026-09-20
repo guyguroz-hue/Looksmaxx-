@@ -11,6 +11,7 @@ import { useCapture, type CaptureOutput } from '@/hooks/useCapture';
 import { explainCameraError, warmUp } from '@/lib/vision/detector';
 import { runPipeline } from '@/lib/analysis/pipeline';
 import { useSession } from '@/lib/store';
+import { saveAnalysis } from '@/lib/supabase/sync';
 
 type Phase = 'prep' | 'live' | 'analyzing' | 'error';
 
@@ -54,8 +55,14 @@ export default function ScanPage() {
         { at: result.createdAt, opportunityCount: result.opportunities.length, quality: result.quality.confidence },
       ].slice(-40),
     }));
-    // The preview lives in memory only, for this session's reveal screen.
+    // The preview lives in memory only, for this session's reveal screen. It is
+    // never persisted and never synced.
     sessionStorage.setItem('form.preview', captured.preview);
+
+    // Best effort: a sync failure must never stand between someone and their
+    // result, which is already complete and stored locally.
+    void saveAnalysis(result).catch(() => {});
+
     router.replace('/results');
   }, [captured, session.preferences, update, router]);
 
