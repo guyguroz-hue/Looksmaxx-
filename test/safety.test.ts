@@ -11,6 +11,7 @@ import { assessQuality } from '@/lib/analysis/quality';
 import { runPipeline } from '@/lib/analysis/pipeline';
 import { ALL_PROTOCOLS } from '@/content/protocols';
 import { EMPTY_INTAKE, INTAKE_STEPS, bmi, isIntakeComplete, type Intake } from '@/content/intake';
+import { buildFacialReport } from '@/lib/vision/facialReport';
 import { synthFace, synthSkin } from './fixtures';
 
 const INTAKE: Intake = {
@@ -27,7 +28,7 @@ const analyse = (faceOpts = {}, skinOver = {}, intake: Intake = INTAKE) => {
   const quality = assessQuality(face.capture, {
     lightness: skin.lightness, balance: skin.lightBalance, detail: skin.localDetail,
   });
-  return runPipeline({ face, skin, quality, intake });
+  return runPipeline({ face, skin, quality, intake, report: null });
 };
 
 const allCopy = (r: ReturnType<typeof analyse>) =>
@@ -216,5 +217,61 @@ describe('intake', () => {
     expect(bmi({ ...EMPTY_INTAKE, heightCm: 180, weightKg: 81 })).toBeCloseTo(25, 1);
     const copy = JSON.stringify(ALL_PROTOCOLS).toLowerCase();
     expect(copy).not.toContain('bmi');
+  });
+});
+
+describe('the measurement report', () => {
+  const report = buildFacialReport(synthFace(), 1000, 1000);
+
+  test('produces a substantial set of measurements', () => {
+    expect(report.metrics.length).toBeGreaterThanOrEqual(20);
+  });
+
+  test('metric ids are unique', () => {
+    const ids = report.metrics.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test('every metric declares whether it can change', () => {
+    for (const m of report.metrics) {
+      expect(['bone', 'soft', 'surface'], m.id).toContain(m.mutability);
+    }
+  });
+
+  test('a structural metric never claims it can be changed', () => {
+    // A "lever" on a bone metric would be the product implying surgery, or
+    // lying. Where bone metrics do carry one it must be about appearance —
+    // styling around the structure, not altering it.
+    for (const m of report.metrics) {
+      if (m.mutability !== 'bone' || !m.lever) continue;
+      const l = m.lever.toLowerCase();
+      expect(/change|increase|reduce|fix|correct|improve/.test(l) && !/perceived|apparent|visual|read|appear|not changeable/.test(l),
+        `${m.id} implies its bone structure can be altered`).toBe(false);
+    }
+  });
+
+  test('no metric is presented as a score or a grade', () => {
+    const json = JSON.stringify(report).toLowerCase();
+    for (const banned of ['score', 'grade', 'rating', 'percentile', 'ideal', 'perfect', 'attractive']) {
+      expect(json, `report copy contains "${banned}"`).not.toContain(banned);
+    }
+  });
+
+  test('typical ranges are ordered and described as references', () => {
+    for (const m of report.metrics) {
+      if (!m.typical) continue;
+      expect(m.typical[0], m.id).toBeLessThan(m.typical[1]);
+    }
+  });
+
+  test('every metric explains itself', () => {
+    for (const m of report.metrics) {
+      expect(m.reading.length, `${m.id} has no reading`).toBeGreaterThan(40);
+      expect(m.label.length, `${m.id} has no label`).toBeGreaterThan(0);
+    }
+  });
+
+  test('a face shape is classified', () => {
+    expect(report.shape).not.toBeNull();
   });
 });

@@ -132,6 +132,22 @@ export default function ResultsPage() {
         </div>
       </motion.section>
 
+      {result.report && (
+        <section className="mt-16 rounded-lg border border-line bg-surface p-5">
+          <Label>Full measurements</Label>
+          <h2 className="mt-2 text-h2 text-balance text-ink">
+            {result.report.metrics.length} numbers about your face
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            Proportions, jaw, eyes, brows, nose and symmetry — measured in millimetres, each one
+            marked as structural or changeable.
+          </p>
+          <Link href="/face" className="mt-4 inline-block text-sm font-medium text-accent-ink underline">
+            Open the measurements
+          </Link>
+        </section>
+      )}
+
       <div className="mt-14 space-y-2">
         <Link
           href="/plan"

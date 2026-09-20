@@ -49,6 +49,7 @@ export default function ScanPage() {
       skin: captured.skin,
       quality: captured.quality,
       intake: session.intake,
+      report: captured.report,
     });
     update((s) => ({
       lastResult: result,

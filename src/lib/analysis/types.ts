@@ -10,6 +10,7 @@
  */
 
 import type { Confidence } from '@/lib/vision/types';
+import type { FacialReport } from '@/lib/vision/facialReport';
 
 export type { Confidence };
 
@@ -96,6 +97,8 @@ export interface AnalysisResult {
   readonly opportunities: readonly Recommendation[];
   /** Everything not surfaced as a headline opportunity, for the full plan. */
   readonly additional: readonly Recommendation[];
+  /** The full measurement set — what a practitioner would walk you through. */
+  readonly report: FacialReport | null;
 }
 
 /** The capture pipeline's explicit states — the UI reacts to these, not timers. */

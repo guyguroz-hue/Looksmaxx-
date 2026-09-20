@@ -45,13 +45,14 @@ const CONCERN_MAP: Record<string, readonly Protocol['category'][]> = {
 };
 
 export interface PipelineInput {
+  readonly report: import('@/lib/vision/facialReport').FacialReport | null;
   readonly face: FaceMeasurements;
   readonly skin: SkinReading | null;
   readonly quality: PhotoQuality;
   readonly intake: Intake;
 }
 
-export function runPipeline({ face, skin, quality, intake }: PipelineInput): AnalysisResult {
+export function runPipeline({ face, skin, quality, intake, report }: PipelineInput): AnalysisResult {
   const ctx = { face, skin, intake };
   const findings = select(ctx);
 
@@ -111,6 +112,7 @@ export function runPipeline({ face, skin, quality, intake }: PipelineInput): Ana
     // Three to five headline items. More than that and nothing gets done.
     opportunities: ranked.slice(0, 5),
     additional: ranked.slice(5),
+    report: report ?? null,
   };
 }
 

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { measureFace, type FaceMeasurements } from '@/lib/vision/faceMeasure';
+import { buildFacialReport, type FacialReport } from '@/lib/vision/facialReport';
 import { readSkin, type SkinReading } from '@/lib/vision/skinRead';
 import { assessQuality } from '@/lib/analysis/quality';
 import { median } from '@/lib/vision/geometry';
@@ -34,6 +35,8 @@ export interface CaptureOutput {
   readonly skin: SkinReading | null;
   readonly quality: PhotoQuality;
   readonly preview: string;
+  /** The full measurement set, built from the final accepted frame. */
+  readonly report: FacialReport | null;
 }
 
 /** Median of every numeric leaf across the accepted frames. */
@@ -178,6 +181,9 @@ export function useCapture() {
             skin,
             quality: finalQuality,
             preview: still?.canvas.toDataURL('image/jpeg', 0.82) ?? '',
+            report: landmarksRef.current
+              ? buildFacialReport(landmarksRef.current, v.videoWidth, v.videoHeight)
+              : null,
           });
           return;
         }

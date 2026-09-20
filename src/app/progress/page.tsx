@@ -123,8 +123,9 @@ export default function ProgressPage() {
       <section className="mt-16 border-t border-hairline pt-8" aria-labelledby="data-h">
         <h2 id="data-h" className="text-sm font-semibold text-ink">Your data</h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-muted">
-          Everything lives in this browser. Photos were never stored at all — they are read in
-          memory and discarded when the tab closes.
+          Everything lives in this browser. Your photo is held only for the current tab so the
+          reveal can show it, and is gone the moment you close it — it is never uploaded and never
+          written to your history.
         </p>
         <div className="mt-4">
           <Button

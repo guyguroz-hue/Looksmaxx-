@@ -102,7 +102,7 @@ export function AccountPanel() {
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
         Everything works without this. An account only means your reads follow you to another
-        device — and only the words and numbers sync. Photos never do.
+        device — and only the words and numbers sync. Your photo never leaves this tab.
       </p>
 
       <form onSubmit={submit} className="mt-6 space-y-2" noValidate>
