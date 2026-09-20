@@ -46,10 +46,7 @@ const overflow = async (label) => {
 await shot('1-welcome'); await overflow('welcome');
 await page.click('text=Start'); await page.waitForTimeout(500);
 await shot('2-goals'); await overflow('goals');
-await page.click('button:has-text("Hair")');
-await page.click('button:has-text("Photos")');
-await page.click('button:has-text("Continue")'); await page.waitForTimeout(450);
-await shot('3-style'); await overflow('style');
+await shot('3-intake-detail'); await overflow('intake');
 
 /* Inject a result by driving the real pipeline in-page via the seeded session. */
 await page.evaluate(() => {
@@ -64,32 +61,32 @@ await page.evaluate(() => {
         detail: 'The three vertical sections of your face fall close to even. This is a useful thing to know because it means most hair and eyewear shapes will work on you — you have room to experiment.' },
     ],
     opportunities: [
-      { id: 'o1', category: 'photo', title: 'Bring the camera to eye level',
+      { id: 'o1', category: 'photo', title: 'Broad-spectrum SPF every morning',
         why: 'Your camera was off eye level, which stretches whichever part of the face is closest to the lens. Levelling it is the single fastest way to get a photo that looks like you.',
         how: ['Hold the phone so the lens is level with your eyes.', 'If you are propping it up, stack it to eye height rather than tilting it.', 'Take one at eye level and one at your usual angle, then compare.'],
-        impact: 'high', effort: 'easy', confidence: 'high', requiresProfessional: false, horizon: 'now', observationIds: ['o1'] },
-      { id: 'o2', category: 'grooming', title: 'Define the lower edge',
+        impact: 'high', effort: 'easy', confidence: 'high', requiresProfessional: false, horizon: 'now', observationIds: ['o1'], evidence: 'A', weeks: [4,24], personalised: true },
+      { id: 'o2', category: 'grooming', title: 'Set a clean neckline',
         why: 'Your widest point sits at the cheekbones, so the jaw line reads softly by comparison. A clean lower edge creates definition where there is none now.',
         how: ['Keep the beard or stubble shorter at the cheeks and slightly longer at the chin.', 'Set the neckline just above the Adam’s apple, not under the chin.', 'Re-trim every three to five days.'],
-        impact: 'high', effort: 'easy', confidence: 'medium', requiresProfessional: false, horizon: 'week', observationIds: ['o2'] },
-      { id: 'o3', category: 'hair', title: 'Try height on top, shorter at the sides',
+        impact: 'high', effort: 'easy', confidence: 'medium', requiresProfessional: false, horizon: 'week', observationIds: ['o2'], evidence: 'C', weeks: [0,2], personalised: false },
+      { id: 'o3', category: 'hair', title: 'Daily facial muscle work',
         why: 'Your proportions are close to square, so hair that adds width at the sides competes with the face rather than framing it. Height changes the read.',
         how: ['Ask for more length on top and tapered sides.', 'Dry with the airflow pointing up and back.', 'Bring a photo to your barber.'],
-        impact: 'high', effort: 'moderate', confidence: 'medium', requiresProfessional: false, horizon: 'month', observationIds: ['o3'] },
-      { id: 'o4', category: 'skin', title: 'Keep the routine short and consistent',
+        impact: 'high', effort: 'moderate', confidence: 'medium', requiresProfessional: false, horizon: 'month', observationIds: ['o3'], evidence: 'C', weeks: [0,4], personalised: false },
+      { id: 'o4', category: 'skin', title: 'Seven to nine hours, consistently',
         why: 'A simple routine done daily outperforms a complicated one done occasionally. Consistency is the part that matters.',
         how: ['Gentle cleanser, moisturiser, daily sun protection.', 'Change one thing at a time.', 'Give any change six to eight weeks.'],
-        impact: 'medium', effort: 'easy', confidence: 'low', requiresProfessional: true, horizon: 'week', observationIds: ['o4'] },
+        impact: 'medium', effort: 'easy', confidence: 'low', requiresProfessional: true, horizon: 'week', observationIds: ['o4'], evidence: 'A', weeks: [1,6], personalised: true, caution: 'Introduce slowly; expect some dryness at first.' },
     ],
     additional: [
-      { id: 'o5', category: 'style', title: 'Open the neckline',
+      { id: 'o5', category: 'style', title: 'Ease off salt in the evening',
         why: 'A crew neck sits as a horizontal line right under a face whose proportions are already wide. A V or open collar breaks that line.',
         how: ['Try a V-neck or an open collar.', 'Avoid high round necks close to the jaw.'],
-        impact: 'medium', effort: 'easy', confidence: 'low', requiresProfessional: false, horizon: 'now', observationIds: ['o5'] },
+        impact: 'medium', effort: 'easy', confidence: 'low', requiresProfessional: false, horizon: 'now', observationIds: ['o5'], evidence: 'B', weeks: [0,1], personalised: false },
     ],
   };
   localStorage.setItem('form.session.v1', JSON.stringify({
-    preferences: { goals: ['hair', 'photo'], style: 'minimal', hair: null, detail: 'balanced', wearsGlasses: false },
+    intake: { age: 29, sex: 'male', heightCm: 178, weightKg: 76, skinTone: 2, skinType: 'combination', sleepHours: 5.5, waterLitres: 1.5, trainingDays: 2, smokes: false, alcohol: 'occasional', sunProtection: 'never', concerns: ['skin'] },
     onboarded: true, lastResult: result, saved: ['o3'], done: ['o1'],
     dismissed: [], history: [{ at: Date.now() - 3 * 86400000, opportunityCount: 4, quality: 'high' }],
   }));

@@ -1,21 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Fraunces } from 'next/font/google';
+import { Geist } from 'next/font/google';
 import './globals.css';
 import { TabBar } from '@/components/TabBar';
 
-const inter = Inter({
+const geist = Geist({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-geist',
   display: 'swap',
-});
-
-/** One display face carries the editorial voice. Optical sizing keeps the big
- *  headlines tight without the small text turning fussy. */
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  variable: '--font-fraunces',
-  display: 'swap',
-  axes: ['SOFT', 'WONK', 'opsz'],
 });
 
 export const metadata: Metadata = {
@@ -23,11 +14,11 @@ export const metadata: Metadata = {
   description:
     'Scan, understand what already works, and get a practical plan built around what you can actually change. Not a score.',
   applicationName: 'FORM',
-  other: { 'color-scheme': 'light' },
+  other: { 'color-scheme': 'dark' },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#FAFAF8',
+  themeColor: '#0C0B0F',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -35,7 +26,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
+    <html lang="en" className={geist.variable}>
       <body>
         <a
           href="#main"

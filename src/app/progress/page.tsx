@@ -33,7 +33,7 @@ export default function ProgressPage() {
     <Shell className="pt-10">
       <header>
         <Label>Progress</Label>
-        <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+        <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
           What you&rsquo;ve explored.
         </h1>
       </header>
@@ -44,7 +44,7 @@ export default function ProgressPage() {
           ['Saved for later', saved.length],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-surface p-5">
-            <dd className="font-display text-[2rem] font-semibold tabular-nums leading-none text-ink">
+            <dd className="text-[2rem] font-semibold tabular-nums leading-none text-ink">
               {value}
             </dd>
             <dt className="mt-2 text-xs text-ink-subtle">{label}</dt>
@@ -64,7 +64,7 @@ export default function ProgressPage() {
       {tried.length > 0 && (
         <section className="mt-14" aria-labelledby="tried-h">
           <Label>Tried</Label>
-          <h2 id="tried-h" className="mt-2 font-display text-h2 font-semibold text-ink">
+          <h2 id="tried-h" className="mt-2 text-h2 font-semibold text-ink">
             You gave these a go
           </h2>
           <ul className="mt-6 divide-y divide-hairline">
@@ -84,7 +84,7 @@ export default function ProgressPage() {
       {saved.length > 0 && (
         <section className="mt-14" aria-labelledby="saved-h">
           <Label>Saved</Label>
-          <h2 id="saved-h" className="mt-2 font-display text-h2 font-semibold text-ink">
+          <h2 id="saved-h" className="mt-2 text-h2 font-semibold text-ink">
             Kept for later
           </h2>
           <ul className="mt-6 divide-y divide-hairline">

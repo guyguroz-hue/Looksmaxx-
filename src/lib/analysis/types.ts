@@ -52,6 +52,13 @@ export interface Recommendation {
   readonly requiresProfessional: boolean;
   readonly horizon: 'now' | 'week' | 'month' | 'optional';
   readonly observationIds: readonly string[];
+  /** A / B / C — stated plainly, because "limited evidence" is information. */
+  readonly evidence: 'A' | 'B' | 'C';
+  /** Realistic weeks to a visible change. */
+  readonly weeks: readonly [number, number];
+  readonly caution?: string;
+  /** True when `why` was written for this person rather than in general. */
+  readonly personalised: boolean;
 }
 
 /** Something already working. Named first, on purpose. */
@@ -90,23 +97,6 @@ export interface AnalysisResult {
   /** Everything not surfaced as a headline opportunity, for the full plan. */
   readonly additional: readonly Recommendation[];
 }
-
-/** What the person told us they want, gathered in onboarding. */
-export interface UserPreferences {
-  readonly goals: readonly Category[];
-  readonly style: 'minimal' | 'classic' | 'street' | 'sporty' | 'smart' | 'experimental' | null;
-  readonly hair: 'low-maintenance' | 'styled' | 'natural' | 'experimental' | null;
-  readonly detail: 'concise' | 'balanced' | 'detailed';
-  readonly wearsGlasses: boolean | null;
-}
-
-export const DEFAULT_PREFERENCES: UserPreferences = {
-  goals: [],
-  style: null,
-  hair: null,
-  detail: 'balanced',
-  wearsGlasses: null,
-};
 
 /** The capture pipeline's explicit states — the UI reacts to these, not timers. */
 export type AnalysisState =

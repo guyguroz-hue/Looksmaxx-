@@ -36,7 +36,7 @@ export function AccountPanel() {
     return (
       <section className="mt-14 border-t border-hairline pt-8" aria-labelledby="acct-h">
         <Label>Saving</Label>
-        <h2 id="acct-h" className="mt-2 font-display text-h2 font-semibold text-ink">
+        <h2 id="acct-h" className="mt-2 text-h2 font-semibold text-ink">
           Stored on this device
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
@@ -53,7 +53,7 @@ export function AccountPanel() {
     return (
       <section className="mt-14 border-t border-hairline pt-8" aria-labelledby="acct-h">
         <Label>Account</Label>
-        <h2 id="acct-h" className="mt-2 font-display text-h2 font-semibold text-ink">
+        <h2 id="acct-h" className="mt-2 text-h2 font-semibold text-ink">
           Your history is saved
         </h2>
         {addr && <p className="mt-2 text-sm text-ink-muted" dir="ltr">{addr}</p>}
@@ -70,7 +70,7 @@ export function AccountPanel() {
     return (
       <section className="mt-14 border-t border-hairline pt-8" aria-live="polite">
         <Label>Check your inbox</Label>
-        <h2 className="mt-2 font-display text-h2 font-semibold text-ink">Link sent</h2>
+        <h2 className="mt-2 text-h2 font-semibold text-ink">Link sent</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           We sent a sign-in link to <strong className="text-ink" dir="ltr">{email}</strong>.
           Opening it brings you back here, signed in.
@@ -97,7 +97,7 @@ export function AccountPanel() {
   return (
     <section className="mt-14 border-t border-hairline pt-8" aria-labelledby="acct-h">
       <Label>Optional</Label>
-      <h2 id="acct-h" className="mt-2 font-display text-h2 font-semibold text-balance text-ink">
+      <h2 id="acct-h" className="mt-2 text-h2 font-semibold text-balance text-ink">
         Keep your history across devices
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">

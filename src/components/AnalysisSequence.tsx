@@ -49,7 +49,7 @@ export function AnalysisSequence({ onDone }: { onDone: () => void }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="font-display text-h2 font-semibold text-ink"
+            className="text-h2 font-semibold text-ink"
           >
             {STAGES[Math.min(stage, STAGES.length - 1)]}
           </motion.p>

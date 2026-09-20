@@ -12,26 +12,27 @@ export default function WelcomePage() {
   return (
     <Shell className="flex min-h-svh flex-col pt-14">
       <header className="flex-1">
-        <p className="font-display text-[1.375rem] font-semibold tracking-[0.18em] text-ink">
+        <p className="text-[1.375rem] font-semibold tracking-[0.18em] text-ink">
           FORM
         </p>
 
-        <h1 className="mt-16 font-display text-display font-semibold text-balance text-ink">
-          See what you
+        <h1 className="mt-16 text-display text-balance text-ink">
+          Small changes.
           <br />
-          can refine.
+          <span className="text-accent-ink">Real ones.</span>
         </h1>
 
-        <p className="mt-6 max-w-[34ch] text-body text-ink-muted">
-          Take one photo. Find out what already works, and get a short list of
-          things worth trying — all of them under your control.
+        <p className="mt-6 max-w-[33ch] text-body text-ink-muted">
+          One photo and a few honest answers. FORM reads what it can actually
+          measure, then tells you what is worth doing about it — and how long
+          it will take.
         </p>
 
         <ul className="mt-12 space-y-4 border-t border-hairline pt-8">
           {[
-            ['No score.', 'You will not be rated, ranked or compared to anyone.'],
-            ['Nothing medical.', 'Presentation and habits only. No diagnosis, ever.'],
-            ['Your photo stays here.', 'It is read on your device and never uploaded.'],
+            ['Never a score.', 'No rating, no ranking, no comparison to anyone else.'],
+            ['Evidence, graded honestly.', 'Every suggestion says how strong the evidence behind it is — including when it is weak.'],
+            ['Your photo stays here.', 'Read on your device, never uploaded, gone when you close the tab.'],
           ].map(([bold, rest]) => (
             <li key={bold} className="flex gap-3 text-sm leading-relaxed">
               <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-accent" />
@@ -51,7 +52,7 @@ export default function WelcomePage() {
           Start
         </Link>
         <p className="mt-3 text-center text-xs text-ink-subtle">
-          Two questions, then one photo. About a minute.
+Four quick steps, then one photo. Under two minutes.
         </p>
       </div>
     </Shell>

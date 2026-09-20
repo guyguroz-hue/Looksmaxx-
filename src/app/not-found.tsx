@@ -6,7 +6,7 @@ export default function NotFound() {
   return (
     <Shell className="flex min-h-svh flex-col justify-center">
       <Label>Not found</Label>
-      <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+      <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
         There&rsquo;s nothing here.
       </h1>
       <p className="mt-3 text-sm text-ink-muted">The page you were after doesn&rsquo;t exist.</p>

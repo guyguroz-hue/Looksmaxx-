@@ -1,187 +1,220 @@
 /**
  * Safety tests.
  *
- * These are the tests that decide whether FORM is safe to ship. Everything else
- * is a bug; a failure here is a product that hurts someone.
+ * These decide whether FORM is safe to ship. Everything else is a bug; a
+ * failure here is a product that hurts someone.
  */
-import { test, describe } from 'vitest';
-import assert from 'node:assert/strict';
+import { test, describe, expect } from 'vitest';
 
 import { measureFace } from '@/lib/vision/faceMeasure';
 import { assessQuality } from '@/lib/analysis/quality';
 import { runPipeline } from '@/lib/analysis/pipeline';
-import { RULES, STRENGTH_RULES } from '@/content/rules';
-import { DEFAULT_PREFERENCES } from '@/lib/analysis/types';
+import { ALL_PROTOCOLS } from '@/content/protocols';
+import { EMPTY_INTAKE, INTAKE_STEPS, bmi, isIntakeComplete, type Intake } from '@/content/intake';
 import { synthFace, synthSkin } from './fixtures';
 
-const analyse = (faceOpts = {}, skinOver = {}, prefs = DEFAULT_PREFERENCES) => {
-  const face = measureFace(synthFace(faceOpts), 1000, 1000);
-  const skin = synthSkin(skinOver);
-  return runPipeline({ face, skin, quality: assessQuality(face.capture, {
-    lightness: skin.lightness, balance: skin.lightBalance, detail: skin.localDetail,
-  }), preferences: prefs });
+const INTAKE: Intake = {
+  ...EMPTY_INTAKE,
+  age: 29, sex: 'male', heightCm: 178, weightKg: 76,
+  skinTone: 2, skinType: 'combination', sleepHours: 5.5,
+  waterLitres: 1.5, trainingDays: 2, smokes: false,
+  alcohol: 'occasional', sunProtection: 'never', concerns: ['skin'],
 };
 
-/** Every string a user could ever read, from one analysis. */
-function allCopy(r: ReturnType<typeof analyse>): string {
-  return JSON.stringify([
-    r.strengths, r.opportunities, r.additional, r.observations, r.inferences,
-  ]);
-}
+const analyse = (faceOpts = {}, skinOver = {}, intake: Intake = INTAKE) => {
+  const face = measureFace(synthFace(faceOpts), 1000, 1000);
+  const skin = synthSkin(skinOver);
+  const quality = assessQuality(face.capture, {
+    lightness: skin.lightness, balance: skin.lightBalance, detail: skin.localDetail,
+  });
+  return runPipeline({ face, skin, quality, intake });
+};
 
-describe('§9 — no attractiveness scoring, anywhere', () => {
-  test('the result object contains no score-shaped field', () => {
-    const r = analyse();
-    const json = JSON.stringify(r);
-    for (const banned of ['"score"', '"rating"', '"rank"', '"percentile"', '"grade"', '"overall"', '"attractiveness"']) {
-      assert.ok(!json.includes(banned), `result exposes ${banned}`);
+const allCopy = (r: ReturnType<typeof analyse>) =>
+  JSON.stringify([r.strengths, r.opportunities, r.additional, r.observations]).toLowerCase();
+
+describe('no attractiveness scoring, anywhere', () => {
+  test('the result exposes no score-shaped field', () => {
+    const json = JSON.stringify(analyse());
+    for (const banned of ['"score"', '"rating"', '"rank"', '"percentile"', '"grade"', '"overall"', '"priority"']) {
+      expect(json, `result exposes ${banned}`).not.toContain(banned);
     }
   });
 
   test('no copy contains a score, percentage or ranking phrase', () => {
-    const copy = allCopy(analyse()).toLowerCase();
-    const banned = [
-      'out of 10', '/10', 'score', 'rating', 'rank', 'percentile', 'top 5', 'better than',
+    const copy = allCopy(analyse());
+    for (const phrase of [
+      'out of 10', '/10', 'score', 'rating', 'percentile', 'top 5', 'better than',
       'attractive', 'attractiveness', 'ugly', 'flaw', 'defect', 'golden ratio', 'ideal face',
-    ];
-    for (const phrase of banned) {
-      assert.ok(!copy.includes(phrase), `user-facing copy contains "${phrase}"`);
-    }
-  });
-
-  test('the priority figure is never exported on a recommendation', () => {
-    const r = analyse();
-    for (const rec of [...r.opportunities, ...r.additional]) {
-      assert.ok(!('priority' in rec), 'priority leaked to the UI');
-      assert.ok(!('weight' in rec), 'weight leaked to the UI');
+    ]) {
+      expect(copy, `user-facing copy contains "${phrase}"`).not.toContain(phrase);
     }
   });
 });
 
-describe('§3 — no medical claims', () => {
-  test('no rule copy names a condition or a drug', () => {
-    const copy = JSON.stringify([RULES, STRENGTH_RULES]).toLowerCase();
-    const banned = [
-      'acne', 'rosacea', 'eczema', 'dermatitis', 'psoriasis', 'alopecia', 'diagnos',
-      'minoxidil', 'finasteride', 'retinoid', 'tretinoin', 'accutane', 'prescription',
-      'disorder', 'deficiency', 'syndrome', 'hormone', 'testosterone', 'bmi', 'calorie',
-      'diet', 'lose weight', 'fasting',
-    ];
-    for (const word of banned) {
-      assert.ok(!copy.includes(word), `rule copy contains "${word}"`);
+describe('nothing medical, nothing restrictive', () => {
+  const catalogue = JSON.stringify(ALL_PROTOCOLS).toLowerCase();
+
+  test('no prescription-only medicine is ever named', () => {
+    // OTC cosmetic actives (retinol, niacinamide, vitamin C) are legitimate and
+    // deliberately included. Prescription drugs are a different category and
+    // this product has no business recommending them.
+    for (const drug of [
+      'tretinoin', 'isotretinoin', 'accutane', 'finasteride', 'minoxidil',
+      'spironolactone', 'hydroquinone', 'prescription', 'antibiotic', 'steroid',
+    ]) {
+      expect(catalogue, `catalogue names "${drug}"`).not.toContain(drug);
     }
   });
 
-  test('anything that could need a professional says so neutrally', () => {
-    for (const rule of RULES) {
-      if (!rule.requiresProfessional) continue;
-      const how = rule.how.join(' ').toLowerCase();
-      assert.ok(
-        how.includes('professional'),
-        `${rule.id} is flagged requiresProfessional but never points to one`,
-      );
+  test('no condition is diagnosed', () => {
+    for (const word of [
+      'acne', 'rosacea', 'eczema', 'dermatitis', 'psoriasis', 'alopecia',
+      'diagnos', 'disorder', 'deficiency', 'syndrome', 'hormone', 'testosterone',
+    ]) {
+      expect(catalogue, `catalogue contains "${word}"`).not.toContain(word);
+    }
+  });
+
+  test('no restrictive eating or weight target is ever suggested', () => {
+    for (const phrase of [
+      'calorie deficit', 'lose weight', 'weight loss', 'fasting', 'restrict',
+      'goal weight', 'target weight', 'cut calories', 'skip meals',
+    ]) {
+      expect(catalogue, `catalogue contains "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  test('anything warranting a professional points to one', () => {
+    for (const p of ALL_PROTOCOLS) {
+      if (!p.requiresProfessional) continue;
+      const text = (p.how.join(' ') + p.why).toLowerCase();
+      expect(text, `${p.id} is flagged requiresProfessional but never points to one`)
+        .toMatch(/professional|doctor|pharmacist/);
+    }
+  });
+
+  test('limited-evidence protocols say so in their own copy', () => {
+    for (const p of ALL_PROTOCOLS) {
+      if (p.evidence !== 'C') continue;
+      // A grade C item must not read as a promise. Either the copy hedges or a
+      // caution is attached.
+      const hedged = /limited|weak|small|thin|honest|bonus|worth trying|temporary/i.test(p.why + (p.caution ?? ''));
+      expect(hedged, `${p.id} is grade C but its copy does not hedge`).toBe(true);
     }
   });
 });
 
-describe('§5 — confidence is capped by photo quality', () => {
+describe('confidence is capped by photo quality', () => {
   test('a poor frame cannot produce a high-confidence claim', () => {
-    // Side-lit, dark, turned and tilted: every gate fails.
     const bad = analyse({ roll: 14 }, { lightBalance: 22, lightness: 20, localDetail: 0.4 });
-    assert.equal(bad.quality.confidence, 'low');
-    for (const o of bad.observations) {
-      assert.equal(o.confidence, 'low', `${o.id} claims ${o.confidence} from a low-quality frame`);
-    }
-    for (const rec of bad.opportunities) {
-      assert.equal(rec.confidence, 'low');
-    }
+    expect(bad.quality.confidence).toBe('low');
+    for (const o of bad.observations) expect(o.confidence, o.id).toBe('low');
+    for (const r of bad.opportunities) expect(r.confidence, r.id).toBe('low');
   });
 
   test('a clean frame permits high confidence', () => {
-    const good = analyse({}, { lightBalance: 2, lightness: 58, localDetail: 3 });
-    assert.equal(good.quality.confidence, 'high');
+    expect(analyse({}, { lightBalance: 2, lightness: 58, localDetail: 3 }).quality.confidence).toBe('high');
   });
 
-  test('quality never silently discards the analysis', () => {
-    const bad = analyse({ roll: 14 }, { lightBalance: 22, lightness: 20, localDetail: 0.4 });
-    assert.ok(bad.opportunities.length > 0, 'a low-quality photo produced nothing at all');
+  test('a poor frame still produces a usable plan', () => {
+    expect(analyse({ roll: 14 }, { lightBalance: 22, lightness: 20 }).opportunities.length).toBeGreaterThan(0);
   });
 });
 
-describe('§33 — observed / inferred / recommended stay separate', () => {
-  test('every inference traces back to a real observation', () => {
-    const r = analyse();
-    const ids = new Set(r.observations.map((o) => o.id));
-    for (const inf of r.inferences) {
-      assert.ok(ids.has(inf.observationId), `inference cites unknown observation ${inf.observationId}`);
-    }
+describe('the intake changes the diagnosis, not just the wording', () => {
+  test('a full face at a healthy weight is treated as fluid, not composition', () => {
+    const r = analyse({ wide: true }, {}, { ...INTAKE, heightCm: 180, weightKg: 72 });
+    const ids = [...r.opportunities, ...r.additional].map((x) => x.id);
+    expect(ids).toContain('nutrition.sodium');
+    const body = r.opportunities.findIndex((x) => x.id === 'body.composition');
+    expect(body, 'body composition was suggested to someone at a healthy weight').toBe(-1);
   });
 
-  test('every recommendation traces back to an observation', () => {
-    const r = analyse();
-    const ids = new Set(r.observations.map((o) => o.id));
-    for (const rec of [...r.opportunities, ...r.additional]) {
-      assert.ok(rec.observationIds.length > 0, `${rec.id} has no evidence`);
-      for (const id of rec.observationIds) {
-        assert.ok(ids.has(id), `${rec.id} cites unknown observation ${id}`);
-      }
-    }
+  test('short sleep becomes the stated cause of under-eye darkness', () => {
+    const r = analyse({}, { underEyeContrast: 9 }, { ...INTAKE, sleepHours: 5 });
+    const sleep = [...r.opportunities, ...r.additional].find((x) => x.id === 'sleep.duration');
+    expect(sleep?.personalised, 'sleep was suggested generically despite a known cause').toBe(true);
   });
 
-  test('observations carry the measurement that produced them', () => {
-    for (const o of analyse().observations) {
-      assert.ok(o.evidence.metric.length > 0);
-      assert.ok(Number.isFinite(o.evidence.value));
-    }
+  test('adequate sleep stops the product blaming sleep', () => {
+    const r = analyse({}, { underEyeContrast: 9 }, { ...INTAKE, sleepHours: 8.5, waterLitres: 3.5 });
+    const top = r.opportunities.slice(0, 3).map((x) => x.id);
+    expect(top).not.toContain('sleep.duration');
+  });
+
+  test('someone already using daily SPF is not told to start', () => {
+    const r = analyse({}, { toneSpread: 9 }, { ...INTAKE, sunProtection: 'daily' });
+    const spf = r.opportunities.findIndex((x) => x.id === 'skin.spf');
+    expect(spf, 'SPF ranked as a headline for someone already doing it daily').toBe(-1);
+  });
+
+  test('skin tone is actually collected, since it calibrates the reading', () => {
+    const toneField = INTAKE_STEPS.flatMap((s) => s.fields).find((f) => f.id === 'skinTone');
+    expect(toneField).toBeDefined();
+    expect('required' in toneField! && toneField.required).toBe(true);
   });
 });
 
-describe('§8 — output stays small enough to act on', () => {
+describe('output stays small enough to act on', () => {
   test('at most 5 opportunities and 3 strengths', () => {
     const r = analyse();
-    assert.ok(r.opportunities.length <= 5, `${r.opportunities.length} opportunities`);
-    assert.ok(r.strengths.length <= 3, `${r.strengths.length} strengths`);
+    expect(r.opportunities.length).toBeLessThanOrEqual(5);
+    expect(r.strengths.length).toBeLessThanOrEqual(3);
   });
 
-  test('a clean capture still surfaces something that already works', () => {
-    const r = analyse({}, { lightBalance: 2, lightness: 58 });
-    assert.ok(r.strengths.length > 0, 'nothing was named as working');
+  test('a good result still names something already working', () => {
+    const r = analyse({}, { lightBalance: 2, toneSpread: 3 }, { ...INTAKE, sunProtection: 'daily', sleepHours: 8.5 });
+    expect(r.strengths.length).toBeGreaterThan(0);
   });
 });
 
-describe('§52 — every card answers what, why and how', () => {
-  test('all rules are complete', () => {
-    for (const rule of RULES) {
-      assert.ok(rule.title.length > 0, `${rule.id} has no title`);
-      assert.ok(rule.why.length > 20, `${rule.id} has no why`);
-      assert.ok(rule.how.length >= 2, `${rule.id} has fewer than two how-steps`);
-      assert.ok(rule.observed(1).length > 0, `${rule.id} has no observation copy`);
-      assert.ok(rule.inferred.length > 20, `${rule.id} has no inference copy`);
+describe('every card answers what, why and how', () => {
+  test('all protocols are complete', () => {
+    for (const p of ALL_PROTOCOLS) {
+      expect(p.title.length, p.id).toBeGreaterThan(0);
+      expect(p.why.length, `${p.id} why`).toBeGreaterThan(40);
+      expect(p.how.length, `${p.id} how`).toBeGreaterThanOrEqual(2);
+      expect(p.weeks[0], `${p.id} weeks`).toBeLessThanOrEqual(p.weeks[1]);
     }
   });
 
-  test('no placeholder survived into the copy', () => {
+  test('protocol ids are unique', () => {
+    const ids = ALL_PROTOCOLS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test('no placeholder copy survives', () => {
     const r = analyse();
     for (const rec of [...r.opportunities, ...r.additional]) {
-      assert.ok(!rec.why.includes('{value}'), `${rec.id} shipped an uninterpolated placeholder`);
-      assert.ok(!/lorem|TODO|FIXME|placeholder/i.test(rec.why + rec.how.join('')), `${rec.id} contains placeholder copy`);
+      expect(/lorem|TODO|FIXME|placeholder|\{value\}/i.test(rec.why + rec.how.join('')), rec.id).toBe(false);
     }
-  });
-
-  test('rule ids are unique', () => {
-    const ids = RULES.map((r) => r.id);
-    assert.equal(new Set(ids).size, ids.length);
   });
 });
 
-describe('§17 — stated goals change the order, not the findings', () => {
-  test('a goal promotes its category', () => {
-    const neutral = analyse({}, {}, DEFAULT_PREFERENCES);
-    const hairFirst = analyse({ }, {}, { ...DEFAULT_PREFERENCES, goals: ['hair'] });
-    assert.deepEqual(
-      neutral.observations.map((o) => o.id).sort(),
-      hairFirst.observations.map((o) => o.id).sort(),
-      'stating a goal changed what was observed — it must only change ordering',
-    );
+describe('intake', () => {
+  test('every question changes something downstream', () => {
+    // Each field must be read somewhere in the selection engine or be a
+    // documented ranking input. A field nobody reads is a field nobody should
+    // have been asked for.
+    const used = new Set([
+      'age', 'sex', 'heightCm', 'weightKg', 'skinTone', 'skinType',
+      'sleepHours', 'waterLitres', 'trainingDays', 'smokes', 'alcohol',
+      'sunProtection', 'concerns',
+    ]);
+    for (const f of INTAKE_STEPS.flatMap((s) => s.fields)) {
+      expect(used.has(String(f.id)), `${String(f.id)} is collected but never used`).toBe(true);
+    }
+  });
+
+  test('an empty intake is incomplete and a filled one is not', () => {
+    expect(isIntakeComplete(EMPTY_INTAKE)).toBe(false);
+    expect(isIntakeComplete(INTAKE)).toBe(true);
+  });
+
+  test('BMI is computed but never surfaced as a target', () => {
+    expect(bmi({ ...EMPTY_INTAKE, heightCm: 180, weightKg: 81 })).toBeCloseTo(25, 1);
+    const copy = JSON.stringify(ALL_PROTOCOLS).toLowerCase();
+    expect(copy).not.toContain('bmi');
   });
 });

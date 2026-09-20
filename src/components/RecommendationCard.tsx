@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Recommendation } from '@/lib/analysis/types';
 import { saveState } from '@/lib/supabase/sync';
-import { CATEGORY_LABEL } from '@/lib/analysis/pipeline';
+import { CATEGORY_LABEL, timeframe } from '@/lib/analysis/pipeline';
+import { EVIDENCE_LABEL } from '@/content/protocols';
 import { ConfidenceIndicator, EffortIndicator, ImpactIndicator } from './ui/Indicator';
 
 /**
@@ -30,7 +31,7 @@ export function RecommendationCard({
       {/* A two-column grid keeps the index and the content aligned at every
           width — the previous hand-computed padding drifted at 320px. */}
       <div className="grid grid-cols-[1.75rem_1fr] gap-x-3">
-        <span className="font-display text-sm tabular-nums leading-6 text-ink-subtle">
+        <span className="text-sm tabular-nums leading-6 text-ink-subtle">
           {String(index + 1).padStart(2, '0')}
         </span>
         <div className="min-w-0">
@@ -38,16 +39,39 @@ export function RecommendationCard({
             {CATEGORY_LABEL[rec.category]}
           </p>
           <h3
-            className={`mt-1.5 font-display text-h2 font-semibold text-balance ${
+            className={`mt-1.5 text-h2 font-semibold text-balance ${
               done ? 'text-ink-subtle line-through decoration-ink-subtle/50' : 'text-ink'
             }`}
           >
             {rec.title}
           </h3>
+          {rec.personalised && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-wash px-2.5 py-1 text-xs font-medium text-accent-ink">
+              <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+              Based on your reading
+            </p>
+          )}
 
         <p className="mt-4 text-sm leading-relaxed text-ink-muted">{rec.why}</p>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        {/* Evidence grade and time-to-effect sit together because they answer
+            the same question: how much should I believe this, and by when? */}
+        <dl className="mt-5 grid grid-cols-2 gap-x-4 rounded-md border border-hairline bg-surface/60 p-3.5">
+          <div>
+            <dt className="text-label uppercase tracking-[0.12em] text-ink-subtle">Evidence</dt>
+            <dd className={`mt-1 text-sm font-medium ${
+              rec.evidence === 'A' ? 'text-good-ink' : rec.evidence === 'B' ? 'text-ink' : 'text-warn-ink'
+            }`}>
+              {EVIDENCE_LABEL[rec.evidence]}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-label uppercase tracking-[0.12em] text-ink-subtle">Expect change</dt>
+            <dd className="mt-1 text-sm font-medium text-ink">{timeframe(rec.weeks)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-3 flex flex-wrap gap-2">
           <ImpactIndicator impact={rec.impact} />
           <EffortIndicator effort={rec.effort} />
           <ConfidenceIndicator confidence={rec.confidence} />
@@ -89,6 +113,12 @@ export function RecommendationCard({
                   </li>
                 ))}
               </ol>
+
+              {rec.caution && (
+                <p className="mt-4 rounded-sm border-l-2 border-warn bg-warn-wash/40 py-2.5 pl-3 pr-2 text-xs leading-relaxed text-ink-muted">
+                  {rec.caution}
+                </p>
+              )}
 
               {rec.requiresProfessional && (
                 <p className="mt-4 rounded-sm border-l-2 border-warn pl-3 text-xs leading-relaxed text-ink-muted">

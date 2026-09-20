@@ -1,164 +1,146 @@
 /**
- * The analysis pipeline (§31).
+ * The analysis pipeline.
  *
- *   quality → extraction → confidence → interpretation → recommendation → priority
+ *   quality → measurement → intake → selection → confidence cap → priority
  *
  * Two properties are enforced here rather than left to discipline:
  *
- * 1. Photo quality caps confidence. A rule cannot claim "high confidence" from
- *    a badly lit, angled frame, because the cap is applied after the rule runs
- *    and the rule has no way to override it.
+ * 1. Photo quality caps confidence. A finding cannot claim certainty the
+ *    photograph does not support, because the cap is applied after selection
+ *    and the selector has no way to override it.
  *
  * 2. The priority figure never leaves this module. It is computed, sorted on,
- *    and discarded — what the UI receives is `high` / `medium` / `low`. A number
- *    on screen is how an appearance tool becomes a scoring tool.
+ *    and discarded — what the UI receives is `high` / `medium` / `low`. A
+ *    number on screen is how an appearance tool becomes a scoring tool.
  */
 
 import type { FaceMeasurements } from '@/lib/vision/faceMeasure';
 import type { SkinReading } from '@/lib/vision/skinRead';
-import { RULES, STRENGTH_RULES, type RuleContext } from '@/content/rules';
+import { select, strengths } from '@/content/selectors';
+import type { Evidence, Protocol } from '@/content/protocols';
+import type { Intake } from '@/content/intake';
 import type {
-  AnalysisResult, Confidence, Effort, Impact, Inference,
-  Observation, PhotoQuality, Recommendation, Strength, UserPreferences,
+  AnalysisResult, Confidence, Effort, Impact, Observation, PhotoQuality, Recommendation,
 } from './types';
 
-const CONFIDENCE_RANK: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
-const RANK_CONFIDENCE: readonly Confidence[] = ['low', 'medium', 'high'];
+const RANK: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
+const BY_RANK: readonly Confidence[] = ['low', 'medium', 'high'];
 
-/** Never claim more certainty than the photograph supports. */
-function capConfidence(rule: Confidence, quality: Confidence): Confidence {
-  const capped = Math.min(CONFIDENCE_RANK[rule], CONFIDENCE_RANK[quality]);
-  return RANK_CONFIDENCE[capped] ?? 'low';
+function cap(claimed: Confidence, quality: Confidence): Confidence {
+  return BY_RANK[Math.min(RANK[claimed], RANK[quality])] ?? 'low';
 }
 
-const IMPACT_WEIGHT: Record<Impact, number> = { high: 3, medium: 2, low: 1 };
-const EFFORT_WEIGHT: Record<Effort, number> = { easy: 1, moderate: 1.8, involved: 3 };
-const CONFIDENCE_WEIGHT: Record<Confidence, number> = { high: 1, medium: 0.7, low: 0.4 };
+const IMPACT_W: Record<Impact, number> = { high: 3, medium: 2, low: 1 };
+const EFFORT_W: Record<Effort, number> = { easy: 1, moderate: 1.8, involved: 3 };
+const CONF_W: Record<Confidence, number> = { high: 1, medium: 0.7, low: 0.4 };
+const EVIDENCE_W: Record<Evidence, number> = { A: 1, B: 0.8, C: 0.55 };
 
-/** Internal only. See the note at the top of this file. */
-function priority(r: Recommendation, prefs: UserPreferences): number {
-  const relevance = prefs.goals.length === 0 ? 1 : prefs.goals.includes(r.category) ? 1.6 : 0.75;
-  return (
-    (IMPACT_WEIGHT[r.impact] * CONFIDENCE_WEIGHT[r.confidence] * relevance) / EFFORT_WEIGHT[r.effort]
-  );
-}
+/** How much of a stated concern each category serves. */
+const CONCERN_MAP: Record<string, readonly Protocol['category'][]> = {
+  skin: ['skin'],
+  jawline: ['grooming', 'presentation'],
+  undereye: ['skin', 'routine'],
+  definition: ['presentation', 'grooming'],
+  hair: ['hair'],
+};
 
 export interface PipelineInput {
   readonly face: FaceMeasurements;
   readonly skin: SkinReading | null;
   readonly quality: PhotoQuality;
-  readonly preferences: UserPreferences;
+  readonly intake: Intake;
 }
 
-export function runPipeline(input: PipelineInput): AnalysisResult {
-  const { face, skin, quality, preferences } = input;
-  const ctx: RuleContext = { face, skin, wearsGlasses: preferences.wearsGlasses };
+export function runPipeline({ face, skin, quality, intake }: PipelineInput): AnalysisResult {
+  const ctx = { face, skin, intake };
+  const findings = select(ctx);
+
+  const concernCats = new Set(
+    (intake.concerns ?? []).flatMap((c) => CONCERN_MAP[c] ?? []),
+  );
 
   const observations: Observation[] = [];
-  const inferences: Inference[] = [];
-  const recommendations: Recommendation[] = [];
+  const scored = findings.map((f) => {
+    const p = f.protocol;
+    const confidence = cap(p.confidence, quality.confidence);
+    if (f.observation) {
+      observations.push({ ...f.observation, confidence: cap(f.observation.confidence, quality.confidence) });
+    }
 
-  for (const rule of RULES) {
-    const value = rule.read(ctx);
-    if (value == null || !Number.isFinite(value)) continue;
-    if (!rule.fires(value, ctx)) continue;
-
-    const confidence = capConfidence(rule.confidence, quality.confidence);
-
-    observations.push({
-      id: rule.id,
-      category: rule.category,
-      observed: rule.observed(value),
-      evidence: { metric: rule.metric, value: Math.round(value * 1000) / 1000, unit: rule.unit },
+    const rec: Recommendation = {
+      id: p.id,
+      category: p.category,
+      title: p.title,
+      why: f.personalWhy ?? p.why,
+      how: p.how,
+      impact: p.impact,
+      effort: p.effort,
       confidence,
-    });
+      requiresProfessional: p.requiresProfessional ?? false,
+      horizon: p.horizon,
+      observationIds: f.observation ? [f.observation.id] : [],
+      evidence: p.evidence,
+      weeks: p.weeks,
+      caution: p.caution,
+      /** True when the copy was written for this person's measurements. */
+      personalised: Boolean(f.personalWhy),
+    };
 
-    inferences.push({ observationId: rule.id, inferred: rule.inferred, confidence });
+    const relevance = concernCats.has(p.category) ? 1.5 : 1;
+    const priority =
+      (IMPACT_W[p.impact] * CONF_W[confidence] * EVIDENCE_W[p.evidence] * relevance * f.boost) /
+      EFFORT_W[p.effort];
 
-    recommendations.push({
-      id: rule.id,
-      category: rule.category,
-      title: rule.title,
-      // A rule may interpolate its own measurement into the copy.
-      why: rule.why.replace('{value}', formatValue(value, rule.unit)),
-      how: rule.how,
-      impact: rule.impact,
-      effort: rule.effort,
-      confidence,
-      requiresProfessional: rule.requiresProfessional ?? false,
-      horizon: rule.horizon,
-      observationIds: [rule.id],
-    });
-  }
+    return { rec, priority };
+  });
 
-  const ranked = recommendations
-    .map((r) => ({ r, p: priority(r, preferences) }))
-    .sort((a, b) => b.p - a.p)
-    .map(({ r }) => r);
+  scored.sort((a, b) => b.priority - a.priority);
+  const ranked = scored.map((s) => s.rec);
 
-  const strengths: Strength[] = STRENGTH_RULES.filter((s) => s.fires(ctx)).map((s) => ({
-    id: s.id,
-    category: s.category,
-    title: s.title,
-    detail: s.detail,
-  }));
+  // Dedupe observations by id, keeping the first (highest-priority) instance.
+  const seen = new Set<string>();
+  const uniqueObs = observations.filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true)));
 
   return {
     id: crypto.randomUUID(),
     createdAt: Date.now(),
     quality,
-    observations,
-    inferences,
-    // 2–3 strengths, 3–5 opportunities. More than that and nothing gets done.
-    strengths: strengths.slice(0, 3),
+    observations: uniqueObs,
+    inferences: [],
+    strengths: strengths(ctx).slice(0, 3),
+    // Three to five headline items. More than that and nothing gets done.
     opportunities: ranked.slice(0, 5),
     additional: ranked.slice(5),
   };
 }
 
-function formatValue(v: number, unit?: string): string {
-  return unit === 'mm' ? `${v.toFixed(0)} mm` : v.toFixed(2);
-}
-
 /* ─────────────────── labels ─────────────────── */
 
 export const IMPACT_LABEL: Record<Impact, string> = {
-  high: 'High impact',
-  medium: 'Medium impact',
-  low: 'Low impact',
+  high: 'High impact', medium: 'Medium impact', low: 'Low impact',
 };
-
 export const EFFORT_LABEL: Record<Effort, string> = {
-  easy: 'Easy',
-  moderate: 'Moderate',
-  involved: 'More effort',
+  easy: 'Easy', moderate: 'Moderate', involved: 'More effort',
 };
-
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  high: 'High confidence',
-  medium: 'Medium confidence',
-  low: 'Low confidence',
+  high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence',
 };
-
 export const HORIZON_LABEL: Record<Recommendation['horizon'], string> = {
-  now: 'Now',
-  week: 'This week',
-  month: 'This month',
-  optional: 'Optional',
+  now: 'Start now', week: 'This week', month: 'This month', optional: 'Optional',
 };
-
 export const CATEGORY_LABEL: Record<Recommendation['category'], string> = {
-  hair: 'Hair',
-  grooming: 'Grooming',
-  skin: 'Skin',
-  style: 'Style',
-  presentation: 'Presentation',
-  photo: 'Photos',
-  eyewear: 'Eyewear',
-  routine: 'Routine',
+  hair: 'Hair', grooming: 'Grooming', skin: 'Skin', style: 'Style',
+  presentation: 'Face & posture', photo: 'Photo', eyewear: 'Eyewear', routine: 'Habits',
 };
 
-/** Group the plan by when it is worth doing (§16). */
+/** Weeks until a visible change, phrased the way a person would say it. */
+export function timeframe(weeks: readonly [number, number]): string {
+  const [lo, hi] = weeks;
+  if (lo === 0) return hi <= 1 ? 'Within a day or two' : `Within ${hi} weeks`;
+  if (lo >= 12) return `${Math.round(lo / 4)}–${Math.round(hi / 4)} months`;
+  return `${lo}–${hi} weeks`;
+}
+
 export function groupByHorizon(recs: readonly Recommendation[]) {
   const order: Recommendation['horizon'][] = ['now', 'week', 'month', 'optional'];
   return order

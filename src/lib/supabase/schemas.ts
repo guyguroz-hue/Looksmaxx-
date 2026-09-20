@@ -33,6 +33,10 @@ export const recommendationSchema = z.object({
   requiresProfessional: z.boolean(),
   horizon: z.enum(['now', 'week', 'month', 'optional']),
   observationIds: z.array(z.string()),
+  evidence: z.enum(['A', 'B', 'C']),
+  weeks: z.tuple([z.number(), z.number()]),
+  caution: z.string().optional(),
+  personalised: z.boolean(),
 });
 
 export const analysisRowSchema = z.object({

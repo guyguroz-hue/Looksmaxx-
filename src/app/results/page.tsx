@@ -29,7 +29,7 @@ export default function ResultsPage() {
     return (
       <Shell className="flex min-h-svh flex-col justify-center">
         <Label>Nothing here yet</Label>
-        <h1 className="mt-3 font-display text-h1 font-semibold text-ink">
+        <h1 className="mt-3 text-h1 font-semibold text-ink">
           Your first read starts here.
         </h1>
         <p className="mt-3 text-sm text-ink-muted">
@@ -49,7 +49,7 @@ export default function ResultsPage() {
       {/* ── the moment ───────────────────────────────────────────── */}
       <motion.header {...fadeUp} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
         <Label>Your read</Label>
-        <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+        <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
           Here&rsquo;s what stands out.
         </h1>
       </motion.header>
@@ -85,7 +85,7 @@ export default function ResultsPage() {
           aria-labelledby="strengths-h"
         >
           <Label>Already working</Label>
-          <h2 id="strengths-h" className="mt-2 font-display text-h2 font-semibold text-ink">
+          <h2 id="strengths-h" className="mt-2 text-h2 font-semibold text-ink">
             Keep doing this
           </h2>
           <ul className="mt-6 space-y-6">
@@ -110,7 +110,7 @@ export default function ResultsPage() {
         aria-labelledby="opps-h"
       >
         <Label>Worth trying</Label>
-        <h2 id="opps-h" className="mt-2 font-display text-h1 font-semibold text-balance text-ink">
+        <h2 id="opps-h" className="mt-2 text-h1 font-semibold text-balance text-ink">
           {result.opportunities.length} things you could experiment with
         </h2>
         <p className="mt-3 text-sm text-ink-muted">

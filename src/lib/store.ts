@@ -9,13 +9,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AnalysisResult, UserPreferences } from './analysis/types';
-import { DEFAULT_PREFERENCES } from './analysis/types';
+import type { AnalysisResult } from './analysis/types';
+import { EMPTY_INTAKE, type Intake } from '@/content/intake';
 
 const KEY = 'form.session.v1';
 
 export interface Session {
-  readonly preferences: UserPreferences;
+  readonly intake: Intake;
   readonly onboarded: boolean;
   readonly lastResult: AnalysisResult | null;
   /** Ids the person chose to keep. */
@@ -28,7 +28,7 @@ export interface Session {
 }
 
 const EMPTY: Session = {
-  preferences: DEFAULT_PREFERENCES,
+  intake: EMPTY_INTAKE,
   onboarded: false,
   lastResult: null,
   saved: [],

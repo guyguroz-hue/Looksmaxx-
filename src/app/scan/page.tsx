@@ -13,7 +13,7 @@ import { runPipeline } from '@/lib/analysis/pipeline';
 import { useSession } from '@/lib/store';
 import { saveAnalysis } from '@/lib/supabase/sync';
 
-type Phase = 'prep' | 'live' | 'analyzing' | 'error';
+type Phase = 'prep' | 'live' | 'review' | 'analyzing' | 'error';
 
 export default function ScanPage() {
   const router = useRouter();
@@ -32,7 +32,9 @@ export default function ScanPage() {
     try {
       const out = await start();
       setCaptured(out);
-      setPhase('analyzing');
+      // Never analyse a frame the person has not seen. They know what a good
+      // photo of themselves looks like better than any gate does.
+      setPhase('review');
     } catch (err) {
       if ((err as { name?: string })?.name === 'AbortError') return;
       setMessage(explainCameraError(err));
@@ -46,7 +48,7 @@ export default function ScanPage() {
       face: captured.face,
       skin: captured.skin,
       quality: captured.quality,
-      preferences: session.preferences,
+      intake: session.intake,
     });
     update((s) => ({
       lastResult: result,
@@ -64,7 +66,7 @@ export default function ScanPage() {
     void saveAnalysis(result).catch(() => {});
 
     router.replace('/results');
-  }, [captured, session.preferences, update, router]);
+  }, [captured, session.intake, update, router]);
 
   if (phase === 'analyzing') return <AnalysisSequence onDone={complete} />;
 
@@ -73,7 +75,7 @@ export default function ScanPage() {
       {phase === 'prep' && (
         <>
           <Label>Before you start</Label>
-          <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+          <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
             One photo, taken well.
           </h1>
           <p className="mt-3 max-w-[36ch] text-sm text-ink-muted">
@@ -89,7 +91,7 @@ export default function ScanPage() {
               ['Nothing covering your face', 'Hat and sunglasses off; hair off your forehead.'],
             ].map(([t, d], i) => (
               <li key={t} className="flex gap-4">
-                <span className="mt-0.5 font-display text-sm tabular-nums text-ink-subtle">
+                <span className="mt-0.5 text-sm tabular-nums text-ink-subtle">
                   0{i + 1}
                 </span>
                 <span>
@@ -113,7 +115,7 @@ export default function ScanPage() {
       {phase === 'live' && (
         <>
           <Label>Capturing</Label>
-          <h1 className="mt-3 font-display text-h2 font-semibold text-ink">
+          <h1 className="mt-3 text-h2 font-semibold text-ink">
             Line up and hold still
           </h1>
 
@@ -123,7 +125,7 @@ export default function ScanPage() {
               quality={live.quality}
               found={live.found}
               progress={live.progress}
-              measuring={live.progress > 0}
+              holding={live.holding}
             />
           </div>
 
@@ -153,10 +155,57 @@ export default function ScanPage() {
         </>
       )}
 
+      {phase === 'review' && captured && (
+        <>
+          <Label>Your shot</Label>
+          <h1 className="mt-3 text-h1 text-balance text-ink">
+            Happy with this one?
+          </h1>
+          <p className="mt-3 text-sm text-ink-muted">
+            Everything below is read from this frame. If it is not a fair photo of you,
+            take another — it costs seconds and changes the whole reading.
+          </p>
+
+          <div className="mt-6 overflow-hidden rounded-xl ring-1 ring-line">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={captured.preview} alt="The photo you just took" className="w-full -scale-x-100" />
+          </div>
+
+          <ul className="mt-6 space-y-2.5">
+            {captured.quality.checks.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-4">
+                <span className={`text-sm ${c.passed ? 'text-ink' : 'text-ink-subtle'}`}>{c.label}</span>
+                <span
+                  className={`flex size-5 items-center justify-center rounded-full text-[11px] ${
+                    c.passed ? 'bg-good-wash text-good-ink' : 'bg-warn-wash text-warn-ink'
+                  }`}
+                >
+                  <span aria-hidden>{c.passed ? '✓' : '!'}</span>
+                  <span className="sr-only">{c.passed ? 'good' : 'could be better'}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {captured.quality.confidence !== 'high' && (
+            <p className="mt-5 rounded-md border-l-2 border-warn bg-warn-wash/40 py-3 pl-4 pr-3 text-sm leading-relaxed text-ink-muted">
+              This frame will still give you something useful, but the reading will be more
+              general than it could be. Retaking it in softer, even light is the single biggest
+              improvement available.
+            </p>
+          )}
+
+          <div className="sticky bottom-0 -mx-5 mt-auto space-y-2 bg-canvas px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:-mx-6 sm:px-6">
+            <Button full onClick={() => setPhase('analyzing')}>Use this photo</Button>
+            <Button full variant="secondary" size="md" onClick={begin}>Retake</Button>
+          </div>
+        </>
+      )}
+
       {phase === 'error' && (
         <div className="flex flex-1 flex-col justify-center py-20">
           <Label>Camera</Label>
-          <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+          <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
             That didn&rsquo;t open.
           </h1>
           <p className="mt-3 text-sm text-ink-muted">{message}</p>

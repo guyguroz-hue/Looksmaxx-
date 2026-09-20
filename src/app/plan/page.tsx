@@ -24,7 +24,7 @@ export default function PlanPage() {
     return (
       <Shell className="flex min-h-svh flex-col justify-center">
         <Label>No plan yet</Label>
-        <h1 className="mt-3 font-display text-h1 font-semibold text-ink">
+        <h1 className="mt-3 text-h1 font-semibold text-ink">
           A plan needs a photo first.
         </h1>
         <Link href="/scan" className="mt-8 inline-flex h-14 items-center justify-center rounded-full bg-accent px-8 font-medium text-ink-invert">
@@ -43,7 +43,7 @@ export default function PlanPage() {
     <Shell className="pt-10">
       <header>
         <Label>Your plan</Label>
-        <h1 className="mt-3 font-display text-h1 font-semibold text-balance text-ink">
+        <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
           Small steps, in order.
         </h1>
         <p className="mt-3 text-sm text-ink-muted">

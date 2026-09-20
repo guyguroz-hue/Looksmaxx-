@@ -11,7 +11,8 @@
 import { supabase, explain } from './client';
 
 type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
-import type { AnalysisResult, Category, UserPreferences } from '@/lib/analysis/types';
+import type { AnalysisResult, Category } from '@/lib/analysis/types';
+import type { Intake } from '@/content/intake';
 import type { RecommendationState, StoredAnalysis } from './database.types';
 import { parseList, recommendationSchema, strengthSchema } from './schemas';
 
@@ -43,7 +44,7 @@ export function onAuthChange(fn: (signedIn: boolean) => void): () => void {
   return () => data.subscription.unsubscribe();
 }
 
-export async function saveProfile(preferences: UserPreferences): Promise<void> {
+export async function saveProfile(preferences: Intake): Promise<void> {
   const sb = supabase();
   const user = await currentUser();
   if (!sb || !user) return;

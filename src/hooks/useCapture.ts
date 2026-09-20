@@ -18,7 +18,16 @@ import { loadFaceLandmarker } from '@/lib/vision/detector';
 import type { AnalysisState, PhotoQuality } from '@/lib/analysis/types';
 import type { Landmark } from '@/lib/vision/types';
 
-const FRAMES_NEEDED = 12;
+/* Hold-steady, measured in TIME rather than animation frames.
+ *
+ * This counted 12 rAF ticks, which at 60fps is 0.2 seconds — the camera opened
+ * and the shot was already taken. A face reading needs a settled frame, so the
+ * gate must stay satisfied continuously for a real interval, and any failed
+ * check resets it. A momentary lock is not a steady one. */
+const HOLD_MS = 2600;
+/* Below this many accepted samples the median has nothing to reject, so a
+ * fast device that clears HOLD_MS quickly still has to supply real frames. */
+const MIN_SAMPLES = 24;
 
 export interface CaptureOutput {
   readonly face: FaceMeasurements;
@@ -59,9 +68,10 @@ export function useCapture() {
   const resolveRef = useRef<((out: CaptureOutput) => void) | null>(null);
 
   const [state, setState] = useState<AnalysisState>('idle');
-  const [live, setLive] = useState<{ quality: PhotoQuality | null; progress: number; found: boolean }>(
-    { quality: null, progress: 0, found: false },
-  );
+  const holdStartRef = useRef<number | null>(null);
+  const [live, setLive] = useState<{
+    quality: PhotoQuality | null; progress: number; found: boolean; holding: boolean;
+  }>({ quality: null, progress: 0, found: false, holding: false });
   const [error, setError] = useState<string | null>(null);
 
   const stop = useCallback(() => {
@@ -91,6 +101,7 @@ export function useCapture() {
     setError(null);
     setState('capturing');
     samplesRef.current = [];
+    holdStartRef.current = null;
 
     const detector = await loadFaceLandmarker();
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -118,7 +129,11 @@ export function useCapture() {
 
         const lm = res.faceLandmarks?.[0] as Landmark[] | undefined;
         if (!lm) {
-          setLive({ quality: null, progress: samplesRef.current.length / FRAMES_NEEDED, found: false });
+          // Losing the face resets the hold — a shot stitched across a gap is
+          // not the same shot.
+          holdStartRef.current = null;
+          samplesRef.current = [];
+          setLive({ quality: null, progress: 0, found: false, holding: false });
           rafRef.current = requestAnimationFrame(tick);
           return;
         }
@@ -126,15 +141,26 @@ export function useCapture() {
         landmarksRef.current = lm;
         const face = measureFace(lm, v.videoWidth, v.videoHeight);
         const quality = assessQuality(face.capture);
-        if (quality.checks.every((c) => c.passed)) samplesRef.current.push(face);
+        const steady = quality.checks.every((c) => c.passed);
 
+        if (steady) {
+          holdStartRef.current ??= performance.now();
+          samplesRef.current.push(face);
+        } else {
+          // Any failed check drops the hold back to zero, visibly.
+          holdStartRef.current = null;
+          samplesRef.current = [];
+        }
+
+        const heldFor = holdStartRef.current == null ? 0 : performance.now() - holdStartRef.current;
         setLive({
           quality,
-          progress: Math.min(1, samplesRef.current.length / FRAMES_NEEDED),
+          progress: Math.min(1, heldFor / HOLD_MS),
           found: true,
+          holding: steady,
         });
 
-        if (samplesRef.current.length >= FRAMES_NEEDED) {
+        if (heldFor >= HOLD_MS && samplesRef.current.length >= MIN_SAMPLES) {
           setState('validating');
           const still = grab();
           const skin = still && landmarksRef.current
