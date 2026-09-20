@@ -45,116 +45,101 @@ export interface IntakeStep {
   readonly id: string;
   readonly title: string;
   readonly lede: string;
+  /** Can be skipped outright; nothing in it is required to produce a reading. */
+  readonly optional?: boolean;
   readonly fields: readonly Field[];
 }
 
 export const INTAKE_STEPS: readonly IntakeStep[] = [
   {
-    id: 'body',
-    title: 'The basics',
-    lede: 'Four numbers that decide which targets your reading is measured against.',
+    id: 'you',
+    title: 'About you',
+    lede: 'Four numbers. They decide which reference ranges your reading is measured against.',
     fields: [
       { kind: 'number', id: 'age', label: 'Age', unit: 'years', min: 16, max: 90, placeholder: '28', required: true,
-        why: 'Skin texture and tone shift with age. Holding a 45-year-old to a 20-year-old target measures age, not care.' },
+        why: 'Skin texture and tone shift with age. Holding a 45-year-old to a 20-year-old reference measures age, not care.' },
       { kind: 'choice', id: 'sex', label: 'Sex', required: true,
-        why: 'Changes which grooming and hair protocols are relevant, and the healthy body-composition range used.',
+        why: 'Changes which grooming protocols are relevant and the healthy body-composition range used.',
         options: [
           { value: 'male', label: 'Male' },
           { value: 'female', label: 'Female' },
-          { value: 'unspecified', label: 'Prefer not to say', note: 'Uses a midpoint range' },
+          { value: 'unspecified', label: 'Prefer not to say' },
         ] },
       { kind: 'number', id: 'heightCm', label: 'Height', unit: 'cm', min: 130, max: 220, placeholder: '178', required: true },
       { kind: 'number', id: 'weightKg', label: 'Weight', unit: 'kg', min: 35, max: 200, placeholder: '76', required: true,
-        why: 'Together with height this separates facial fullness caused by fluid from fullness caused by body composition. Those two need opposite advice.' },
+        why: 'With height, this separates facial fullness caused by fluid from fullness caused by body composition. Those two need opposite advice, and a photo cannot tell them apart.' },
     ],
   },
   {
     id: 'skin',
-    title: 'Your skin',
-    lede: 'This improves the pixel reading itself, not just the suggestions.',
+    title: 'Skin and sleep',
+    lede: 'Three taps. The first one improves the pixel reading itself, not just the advice.',
     fields: [
       { kind: 'choice', id: 'skinTone', label: 'Skin tone', required: true,
         why: 'Redness is measured against a neutral-skin baseline. One baseline for every tone reads normal skin as inflamed for some people and misses real redness in others.',
         options: [
-          { value: 1, label: 'Very fair', note: 'Always burns, rarely tans' },
-          { value: 2, label: 'Fair', note: 'Burns easily, tans minimally' },
-          { value: 3, label: 'Light–medium', note: 'Sometimes burns, tans gradually' },
-          { value: 4, label: 'Olive / medium', note: 'Rarely burns, tans easily' },
-          { value: 5, label: 'Brown', note: 'Very rarely burns, tans deeply' },
+          { value: 1, label: 'Very fair', note: 'Always burns' },
+          { value: 2, label: 'Fair', note: 'Burns easily' },
+          { value: 3, label: 'Light–medium', note: 'Sometimes burns' },
+          { value: 4, label: 'Olive / medium', note: 'Rarely burns' },
+          { value: 5, label: 'Brown', note: 'Very rarely burns' },
           { value: 6, label: 'Deep brown / black', note: 'Almost never burns' },
         ] },
-      { kind: 'choice', id: 'skinType', label: 'Skin type',
-        why: 'Decides which textures and actives suit you — the same ingredient helps one type and irritates another.',
-        options: [
-          { value: 'dry', label: 'Dry' },
-          { value: 'oily', label: 'Oily' },
-          { value: 'combination', label: 'Combination' },
-          { value: 'normal', label: 'Normal' },
-          { value: 'sensitive', label: 'Sensitive' },
-        ] },
       { kind: 'choice', id: 'sunProtection', label: 'Sun protection', required: true,
-        why: 'If tone is uneven and you are not using any, that is the highest-evidence lever available. If you already use it daily, the cause is elsewhere.',
+        why: 'If tone reads uneven and you use none, that is the highest-evidence change available to you. If you already use it daily, the cause is elsewhere.',
         options: [
           { value: 'never', label: 'Almost never' },
           { value: 'sometimes', label: 'Strong sun only' },
           { value: 'daily', label: 'Every day' },
         ] },
-    ],
-  },
-  {
-    id: 'habits',
-    title: 'Daily habits',
-    lede: 'These explain most of what changes week to week.',
-    fields: [
       { kind: 'choice', id: 'sleepHours', label: 'Sleep on a typical night', required: true,
         why: 'The fastest-moving input to under-eye contrast and facial fluid. If yours is short, most of what you see has one cause.',
         options: [
           { value: 4.5, label: 'Under 5 hours' },
-          { value: 5.5, label: '5–6 hours' },
-          { value: 6.5, label: '6–7 hours' },
-          { value: 7.5, label: '7–8 hours' },
-          { value: 8.5, label: '8+ hours' },
+          { value: 5.5, label: '5–6' },
+          { value: 6.5, label: '6–7' },
+          { value: 7.5, label: '7–8' },
+          { value: 8.5, label: '8 or more' },
         ] },
-      { kind: 'choice', id: 'waterLitres', label: 'Water per day',
-        why: 'Mild dehydration deepens the hollow under the eyes and dulls the skin surface.',
-        options: [
-          { value: 0.75, label: 'Under 1 litre' },
-          { value: 1.5, label: '1–2 litres' },
-          { value: 2.5, label: '2–3 litres' },
-          { value: 3.5, label: 'Over 3 litres' },
-        ] },
-      { kind: 'choice', id: 'trainingDays', label: 'Training days per week',
-        why: 'Decides whether the advice is to start or to progress.',
-        options: [
-          { value: 0, label: 'None' },
-          { value: 2, label: '1–2' },
-          { value: 4, label: '3–4' },
-          { value: 6, label: '5+' },
-        ] },
-      { kind: 'choice', id: 'alcohol', label: 'Alcohol',
-        why: 'Dilates vessels and holds fluid — it moves redness and puffiness more than most people expect.',
-        options: [
-          { value: 'none', label: 'None' },
-          { value: 'occasional', label: 'Occasionally' },
-          { value: 'weekly', label: 'Weekly' },
-          { value: 'frequent', label: 'Several times a week' },
-        ] },
-      { kind: 'choice', id: 'smokes', label: 'Do you smoke or vape?',
-        why: 'Smoking works against every other protocol here by reducing blood flow to the skin.',
-        options: [{ value: false, label: 'No' }, { value: true, label: 'Yes' }] },
     ],
   },
   {
-    id: 'focus',
-    title: 'What matters to you',
-    lede: 'This moves the order of your plan. It never changes the findings.',
+    /* Everything here sharpens the reading, and nothing here blocks it. The
+       skip is a single tap, and the results screen offers these again later —
+       a long form before anyone has seen value is how intake screens get
+       abandoned. */
+    id: 'more',
+    title: 'Anything else?',
+    lede: 'Optional, and skippable in one tap. Each answer makes the plan more specific.',
+    optional: true,
     fields: [
-      { kind: 'multi', id: 'concerns', label: 'Pick up to three', max: 3,
+      { kind: 'choice', id: 'skinType', label: 'Skin type',
         options: [
-          { value: 'skin', label: 'Skin texture and tone' },
-          { value: 'jawline', label: 'Jaw and neck definition' },
-          { value: 'undereye', label: 'Under-eye area' },
-          { value: 'definition', label: 'Facial definition' },
+          { value: 'dry', label: 'Dry' }, { value: 'oily', label: 'Oily' },
+          { value: 'combination', label: 'Combination' }, { value: 'normal', label: 'Normal' },
+          { value: 'sensitive', label: 'Sensitive' },
+        ] },
+      { kind: 'choice', id: 'trainingDays', label: 'Training days per week',
+        options: [
+          { value: 0, label: 'None' }, { value: 2, label: '1–2' },
+          { value: 4, label: '3–4' }, { value: 6, label: '5+' },
+        ] },
+      { kind: 'choice', id: 'waterLitres', label: 'Water per day',
+        options: [
+          { value: 0.75, label: 'Under 1L' }, { value: 1.5, label: '1–2L' },
+          { value: 2.5, label: '2–3L' }, { value: 3.5, label: 'Over 3L' },
+        ] },
+      { kind: 'choice', id: 'alcohol', label: 'Alcohol',
+        options: [
+          { value: 'none', label: 'None' }, { value: 'occasional', label: 'Occasionally' },
+          { value: 'weekly', label: 'Weekly' }, { value: 'frequent', label: 'Several times a week' },
+        ] },
+      { kind: 'choice', id: 'smokes', label: 'Smoke or vape?',
+        options: [{ value: false, label: 'No' }, { value: true, label: 'Yes' }] },
+      { kind: 'multi', id: 'concerns', label: 'What matters most to you?', max: 3,
+        options: [
+          { value: 'skin', label: 'Skin' }, { value: 'jawline', label: 'Jaw & neck' },
+          { value: 'undereye', label: 'Under-eye' }, { value: 'definition', label: 'Definition' },
           { value: 'hair', label: 'Hair' },
         ] },
     ],

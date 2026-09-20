@@ -10,14 +10,16 @@ import { AnalysisSequence } from '@/components/AnalysisSequence';
 import { useCapture, type CaptureOutput } from '@/hooks/useCapture';
 import { explainCameraError, warmUp } from '@/lib/vision/detector';
 import { runPipeline } from '@/lib/analysis/pipeline';
+import Link from 'next/link';
 import { useSession } from '@/lib/store';
+import { isIntakeComplete } from '@/content/intake';
 import { saveAnalysis } from '@/lib/supabase/sync';
 
 type Phase = 'prep' | 'live' | 'review' | 'analyzing' | 'error';
 
 export default function ScanPage() {
   const router = useRouter();
-  const { session, update } = useSession();
+  const { session, hydrated, update } = useSession();
   const [phase, setPhase] = useState<Phase>('prep');
   const [message, setMessage] = useState<string | null>(null);
   const [captured, setCaptured] = useState<CaptureOutput | null>(null);
@@ -75,6 +77,14 @@ export default function ScanPage() {
     <Shell className="flex min-h-svh flex-col pt-10">
       {phase === 'prep' && (
         <>
+          {hydrated && isIntakeComplete(session.intake) && (
+            <p className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink-muted">
+              <span>Using your saved answers.</span>
+              <Link href="/onboarding" className="font-medium text-accent-ink underline">
+                Change them
+              </Link>
+            </p>
+          )}
           <Label>Before you start</Label>
           <h1 className="mt-3 text-h1 font-semibold text-balance text-ink">
             One photo, taken well.

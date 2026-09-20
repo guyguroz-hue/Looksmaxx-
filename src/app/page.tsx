@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { Shell } from '@/components/Shell';
+import { useSession } from '@/lib/store';
+import { isIntakeComplete } from '@/content/intake';
 
 /**
  * Welcome.
@@ -9,6 +13,10 @@ import { Shell } from '@/components/Shell';
  * rather than into a footnote.
  */
 export default function WelcomePage() {
+  const { session, hydrated } = useSession();
+  // A returning visitor has already answered; send them to the camera.
+  const returning = hydrated && isIntakeComplete(session.intake);
+
   return (
     <Shell className="flex min-h-svh flex-col pt-14">
       <header className="flex-1">
@@ -46,13 +54,13 @@ export default function WelcomePage() {
 
       <div className="sticky bottom-0 -mx-5 mt-12 bg-canvas px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:-mx-6 sm:px-6">
         <Link
-          href="/onboarding"
+          href={returning ? '/scan' : '/onboarding'}
           className="flex h-14 w-full items-center justify-center rounded-full bg-accent text-base font-medium text-ink-invert transition-colors duration-200 hover:bg-accent-hover active:scale-[0.985]"
         >
-          Start
+          {returning ? 'Take a photo' : 'Start'}
         </Link>
         <p className="mt-3 text-center text-xs text-ink-subtle">
-Four quick steps, then one photo. Under two minutes.
+{returning ? 'Your answers are saved.' : 'Two quick steps, then one photo. Under a minute.'}
         </p>
       </div>
     </Shell>

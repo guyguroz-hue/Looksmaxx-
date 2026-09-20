@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shell } from '@/components/Shell';
 import { Label } from '@/components/ui/Label';
@@ -19,9 +19,19 @@ import { INTAKE_STEPS, missingIn, type Intake } from '@/content/intake';
  */
 export default function IntakePage() {
   const router = useRouter();
-  const { session, update } = useSession();
+  const { session, hydrated, update } = useSession();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Intake>(session.intake);
+
+  /* Saved answers arrive one render late, because localStorage cannot be read
+     during server rendering. Adopt them once — and only while the form is
+     still untouched, so hydration can never overwrite something being typed. */
+  const [adopted, setAdopted] = useState(false);
+  useEffect(() => {
+    if (!hydrated || adopted) return;
+    setDraft((d) => (Object.values(d).some((v) => v !== null && (!Array.isArray(v) || v.length)) ? d : session.intake));
+    setAdopted(true);
+  }, [hydrated, adopted, session.intake]);
   const [shown, setShown] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
@@ -34,12 +44,16 @@ export default function IntakePage() {
     setTouched(false);
   };
 
+  const finish = (value: Intake) => {
+    update({ intake: value, onboarded: true });
+    void saveProfile(value).catch(() => {});
+    router.push('/scan');
+  };
+
   const next = () => {
     if (missing.length > 0) { setTouched(true); return; }
     if (!isLast) { setStep((s) => s + 1); window.scrollTo({ top: 0 }); return; }
-    update({ intake: draft, onboarded: true });
-    void saveProfile(draft).catch(() => {});
-    router.push('/scan');
+    finish(draft);
   };
 
   return (
@@ -64,7 +78,9 @@ export default function IntakePage() {
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           className="flex-1 pb-8 pt-9"
         >
-          <Label>Step {step + 1} of {INTAKE_STEPS.length}</Label>
+          <Label>
+            {current.optional ? 'Optional' : `Step ${step + 1} of ${INTAKE_STEPS.filter((x) => !x.optional).length}`}
+          </Label>
           <h1 className="mt-3 text-h1 text-balance text-ink">{current.title}</h1>
           <p className="mt-2.5 max-w-[38ch] text-sm text-ink-muted">{current.lede}</p>
 
@@ -204,15 +220,23 @@ export default function IntakePage() {
       </AnimatePresence>
 
       <div className="sticky bottom-0 -mx-5 mt-10 space-y-2 bg-canvas/90 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-lg sm:-mx-6 sm:px-6">
-        <Button full onClick={next}>{isLast ? 'Take the photo' : 'Continue'}</Button>
-        <Button
-          full
-          variant="ghost"
-          size="md"
-          onClick={() => (step === 0 ? router.push('/') : setStep((s) => s - 1))}
-        >
-          Back
+        <Button full onClick={next}>
+          {isLast ? 'Take the photo' : current.optional ? 'Continue' : 'Continue'}
         </Button>
+        {current.optional ? (
+          <Button full variant="ghost" size="md" onClick={() => finish(draft)}>
+            Skip — take the photo
+          </Button>
+        ) : (
+          <Button
+            full
+            variant="ghost"
+            size="md"
+            onClick={() => (step === 0 ? router.push('/') : setStep((s) => s - 1))}
+          >
+            Back
+          </Button>
+        )}
       </div>
     </Shell>
   );

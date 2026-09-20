@@ -10,7 +10,7 @@ import { measureFace } from '@/lib/vision/faceMeasure';
 import { assessQuality } from '@/lib/analysis/quality';
 import { runPipeline } from '@/lib/analysis/pipeline';
 import { ALL_PROTOCOLS } from '@/content/protocols';
-import { EMPTY_INTAKE, INTAKE_STEPS, bmi, isIntakeComplete, type Intake } from '@/content/intake';
+import { EMPTY_INTAKE, INTAKE_STEPS, bmi, isIntakeComplete, missingIn, type Intake } from '@/content/intake';
 import { buildFacialReport } from '@/lib/vision/facialReport';
 import { synthFace, synthSkin } from './fixtures';
 
@@ -273,5 +273,45 @@ describe('the measurement report', () => {
 
   test('a face shape is classified', () => {
     expect(report.shape).not.toBeNull();
+  });
+});
+
+describe('the intake stays short and is remembered', () => {
+  test('at most two required steps', () => {
+    const required = INTAKE_STEPS.filter((s) => !s.optional);
+    expect(required.length, 'required steps').toBeLessThanOrEqual(2);
+  });
+
+  test('at most eight required fields in total', () => {
+    const n = INTAKE_STEPS.flatMap((s) => s.fields).filter((f) => 'required' in f && f.required).length;
+    expect(n, `${n} required fields`).toBeLessThanOrEqual(8);
+  });
+
+  test('every optional step can be skipped without blocking a reading', () => {
+    for (const s of INTAKE_STEPS.filter((x) => x.optional)) {
+      expect(missingIn(s, EMPTY_INTAKE).length, `${s.id} blocks`).toBe(0);
+    }
+  });
+
+  test('the required fields alone are enough to complete intake', () => {
+    // Anything the optional step collects must be genuinely optional — if this
+    // fails, a "skip" button would leave the user stuck.
+    const minimal: Intake = {
+      ...EMPTY_INTAKE,
+      age: 30, sex: 'male', heightCm: 175, weightKg: 72,
+      skinTone: 3, sunProtection: 'never', sleepHours: 7.5,
+    };
+    expect(isIntakeComplete(minimal)).toBe(true);
+  });
+
+  test('a minimal intake still produces a full plan', () => {
+    const minimal: Intake = {
+      ...EMPTY_INTAKE,
+      age: 30, sex: 'male', heightCm: 175, weightKg: 72,
+      skinTone: 3, sunProtection: 'never', sleepHours: 7.5,
+    };
+    const r = analyse({}, {}, minimal);
+    expect(r.opportunities.length).toBeGreaterThan(0);
+    expect(r.report).toBeNull();   // seeded null in this harness
   });
 });

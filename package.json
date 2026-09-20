@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:rls": "bash test/rls.sh",
     "verify": "npm run typecheck && npm test && npm run build",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:persistence": "node test/persistence.mjs",
+    "test:visual": "node test/visual.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.21",
