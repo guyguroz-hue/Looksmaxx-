@@ -165,6 +165,16 @@ export function useCapture() {
 
         if (heldFor >= HOLD_MS && samplesRef.current.length >= MIN_SAMPLES) {
           setState('validating');
+
+          /* Everything that reads the video must happen BEFORE the stream is
+             stopped. Stopping the tracks resets videoWidth/videoHeight to 0,
+             which made the aspect ratio NaN, poisoned every coordinate, and
+             silently dropped the millimetre calibration — the report came back
+             with every length reading 0 mm. Take the dimensions once, up front,
+             and build everything from those. */
+          const vw = v.videoWidth;
+          const vh = v.videoHeight;
+
           const still = grab();
           const skin = still && landmarksRef.current
             ? readSkin(still.data, landmarksRef.current)
@@ -174,17 +184,14 @@ export function useCapture() {
             fused.capture,
             skin ? { lightness: skin.lightness, balance: skin.lightBalance, detail: skin.localDetail } : undefined,
           );
+          const report = landmarksRef.current
+            ? buildFacialReport(landmarksRef.current, vw, vh)
+            : null;
+          const preview = still?.canvas.toDataURL('image/jpeg', 0.82) ?? '';
+
           stop();
           setState('analyzing');
-          resolve({
-            face: fused,
-            skin,
-            quality: finalQuality,
-            preview: still?.canvas.toDataURL('image/jpeg', 0.82) ?? '',
-            report: landmarksRef.current
-              ? buildFacialReport(landmarksRef.current, v.videoWidth, v.videoHeight)
-              : null,
-          });
+          resolve({ face: fused, skin, quality: finalQuality, preview, report });
           return;
         }
         rafRef.current = requestAnimationFrame(tick);

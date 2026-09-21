@@ -101,10 +101,16 @@ export function buildFacialReport(lm: readonly Landmark[], w: number, h: number)
   const p = canonical(lm, w, h);
   const at = (i: number): Point => p[i] ?? { x: 0, y: 0 };
   const mm = scaleMm(p);
-  const toMm = (v: number) => (mm != null ? round(v * mm, 1) : 0);
+  /* Returns null when the iris could not be measured. A length of "0 mm" is
+     not a measurement — it is a missing one wearing a number, and rendering it
+     tells the reader something false about their own face. */
+  const toMm = (v: number): number | null => (mm != null ? round(v * mm, 1) : null);
 
   const m: FacialMetric[] = [];
-  const push = (x: FacialMetric) => { if (Number.isFinite(x.value)) m.push(x); };
+  const push = (x: FacialMetric | (Omit<FacialMetric, 'value'> & { value: number | null })) => {
+    if (x.value == null || !Number.isFinite(x.value)) return;
+    m.push(x as FacialMetric);
+  };
 
   /* ── core lengths ─────────────────────────────────────────────── */
   const oval = L.FACE_OVAL.map(at);

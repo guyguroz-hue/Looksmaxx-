@@ -315,3 +315,33 @@ describe('the intake stays short and is remembered', () => {
     expect(r.report).toBeNull();   // seeded null in this harness
   });
 });
+
+describe('a failed calibration never invents a measurement', () => {
+  test('uncalibrated lengths are omitted rather than shown as zero', () => {
+    // Reproduces the reported bug: the video had already been stopped, so the
+    // frame dimensions were 0, the aspect ratio was NaN and every millimetre
+    // value came back as 0.
+    const stopped = buildFacialReport(synthFace(), 0, 0);
+    expect(stopped.mmPerUnit).toBeNull();
+    for (const m of stopped.metrics) {
+      expect(m.unit === 'mm' && m.value === 0, `${m.id} rendered as a zero-length measurement`).toBe(false);
+    }
+  });
+
+  test('no LENGTH reads as zero when calibration succeeded', () => {
+    // Symmetry is excluded on purpose: it is a deviation, and 0 mm there is a
+    // real result meaning "perfectly even" rather than a missing measurement.
+    const live = buildFacialReport(synthFace(), 1000, 1000);
+    for (const m of live.metrics) {
+      if (m.unit !== 'mm' || m.group === 'symmetry') continue;
+      expect(m.value, `${m.id} is 0 mm`).toBeGreaterThan(0);
+    }
+  });
+
+  test('a live frame still produces the full set', () => {
+    const live = buildFacialReport(synthFace(), 1000, 1000);
+    const stopped = buildFacialReport(synthFace(), 0, 0);
+    expect(live.metrics.length).toBeGreaterThan(stopped.metrics.length);
+    expect(live.metrics.length).toBeGreaterThanOrEqual(25);
+  });
+});

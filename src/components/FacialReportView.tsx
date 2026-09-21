@@ -127,9 +127,10 @@ export function FacialReportView({ report }: { report: FacialReport }) {
       </p>
 
       {report.mmPerUnit == null && (
-        <p className="mt-4 rounded-md border-l-2 border-warn bg-warn-wash/40 py-3 pl-4 pr-3 text-sm text-ink-muted">
-          The iris was not clear enough to calibrate millimetres, so the ratios below are reliable
-          but the absolute lengths are not.
+        <p className="mt-4 rounded-md border-l-2 border-warn bg-warn-wash/40 py-3 pl-4 pr-3 text-sm leading-relaxed text-ink-muted">
+          The iris was not sharp enough to calibrate millimetres in this frame, so the
+          length measurements are left out rather than guessed at. Every ratio and angle below is
+          unaffected. A closer, better-lit photo will bring the lengths back.
         </p>
       )}
 
